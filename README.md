@@ -79,8 +79,26 @@ August 2026/
 
 ## Documentation
 
-- **`workspace_map.txt`** — Complete technical reference (folder tree, script parameters, data flow, architecture, recent changes)
-- **`data/README.md`** — Raw data file requirements and placement
+- **`workspace_map.txt`** — Complete technical reference (folder tree, script parameters, data flow, architecture, recent changes, file discovery behavior)
+- **`data/README.md`** — Raw data file requirements, placement, and glob-based discovery behavior
+
+---
+
+## File Discovery Behavior
+
+Ingestion scripts use **glob patterns** to discover raw CSV files in `data/raw/`, not a fixed count:
+
+| Script | Discovery Pattern | Processes |
+|--------|-------------------|-----------|
+| Steps 1-5 (`whale_tracking`, `time_series_analysis`, `chaser_detection`, `operator_analysis`, `generate_heatmap_matrix`) | `*.csv` in `data/raw/` | **All** matching files |
+| Step 6 (`build_all_players_dossiers`) | `*EXPORT_CSV*.csv` in `data/raw/` | **Each file independently** → creates per-export index (`all_players_index_XX.json`) + chunks (`dossier_chunks_XX/`) |
+| Step 7 (`generate_player_behavior_data`) | First 5 `*EXPORT_CSV*.csv` (sorted) | **Only first 5** |
+| Step 8 (`build_individual_dossiers`) | First 5 exports + derived CSVs | **Only first 5** exports |
+| Step 13 (`probability_he_ingest`) | `mnt_game_probability_he_YYYYMMDD.csv` in `data/probability/` | **All** daily snapshots |
+
+**Adding more raw exports:** Steps 1-6 and 13 automatically process new files on next run. Steps 7-8 remain limited to first 5 for performance. Skip-guards use file modification times — new files trigger reprocessing of dependent steps.
+
+See `workspace_map.txt` sections 2A and 6 for complete details.
 
 ---
 

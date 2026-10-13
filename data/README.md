@@ -2,10 +2,23 @@
 
 This directory contains raw data files that are **NOT committed to Git** due to size.
 
+## File Discovery Behavior
+
+Scripts discover files via **glob patterns** — not a fixed count of 27:
+
+| Script(s) | Pattern | Scope |
+|-----------|---------|-------|
+| Steps 1-5, 6, 13 | `*.csv` / `*EXPORT_CSV*.csv` / `mnt_game_probability_he_YYYYMMDD.csv` | **All matching files** |
+| Steps 7-8 | First 5 `*EXPORT_CSV*.csv` (by name sort) | **First 5 only** (performance) |
+
+**Adding more files:** Drop new CSVs into `raw/` or `probability/` — steps 1-6 and 13 auto-process them on next pipeline run. Steps 7-8 stay limited to first 5.
+
+---
+
 ## Required Files
 
-### `raw/` — Transaction Export CSVs (27 files, ~9.5 GB total)
-Place the 27 raw CSV export files here. Each file is ~300-377 MB.
+### `raw/` — Transaction Export CSVs (~9.5 GB total)
+Place raw CSV export files here. Each file is ~300-377 MB.
 
 **Naming pattern:** `YYYY-MM-DD-HH-MM-SS_EXPORT_CSV_XXXXX_XXX_0.csv`
 
@@ -37,4 +50,4 @@ Run the full pipeline to process these files:
 py scripts/generate_all_dashboards.py
 ```
 
-See `workspace_map.txt` for complete data flow documentation.
+See `workspace_map.txt` for complete data flow documentation (sections 2A, 4, 6).
