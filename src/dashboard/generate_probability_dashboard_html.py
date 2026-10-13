@@ -69,6 +69,7 @@ def build_dashboard():
     .table-total td { color: #f8fafc; font-weight: 700; background: #16213a80; }
     .game-sections { display: contents; }
     .grid.nested { margin-top: 12px; }
+    .chart-card.single { margin-top: 12px; }
     .chart.tall { height: 430px; }
     article[id] { scroll-margin-top: 200px; }
     header .filters { flex-basis: 100%; align-items: center; margin-top: 10px; padding-top: 8px; border-top: 1px solid #253247; }
@@ -163,6 +164,7 @@ def build_dashboard():
     };
     const types = DATA.game_types || [];
     const gameAnchors = [];
+    const gameHeAvailable = [];
     const usedAnchors = new Set();
     const slugify = value => String(value).toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-+|-+$/g, '');
     const uniqueGameAnchor = gameType => {
@@ -292,6 +294,9 @@ def build_dashboard():
       const container = document.getElementById('gameSections');
       const fragment = document.createDocumentFragment();
       types.forEach((game, index) => {
+        const hePoints = pair(DATA.series_he, game.game_type).filter(([, value]) => value != null);
+        const heAvailable = game.mean_actual_he != null && hePoints.length > 0;
+        gameHeAvailable.push(heAvailable);
         const article = document.createElement('article');
         article.className = 'card chart-card wide';
         article.id = uniqueGameAnchor(game.game_type);
@@ -300,21 +305,19 @@ def build_dashboard():
           <h3>${escapeHtml(game.game_type)}</h3>
           <div class="muted" id="gameMeta-${index}"></div>
           <div class="table-wrap"><table>
-            <thead><tr><th>Bet place</th><th>Days</th><th>Actual HE</th><th>Expected HE</th><th>HE delta</th><th>Actual prob.</th><th>Expected prob.</th><th>Threshold</th><th>Breach rows %</th></tr></thead>
+            <thead id="gameHead-${index}"></thead>
             <tbody id="gameRows-${index}"></tbody>
           </table></div>
-          <div class="grid nested">
-            <article class="card chart-card"><h3>${escapeHtml(game.game_type)} - HE Trend</h3><div class="muted">Daily actual vs expected house edge · honours the trend window and date range</div><div id="gameHe-${index}" class="chart"></div></article>
-            <article class="card chart-card"><h3>${escapeHtml(game.game_type)} - Probability and threshold trend</h3><div class="muted">Daily average probability and threshold · honours the trend window and date range</div><div id="gameProb-${index}" class="chart"></div></article>
-          </div>`;
+          <article class="card chart-card single" id="gameHeCard-${index}"${heAvailable ? '' : ' style="display:none"'}>
+            <h3>${escapeHtml(game.game_type)} - HE Trend</h3>
+            <div class="muted">Daily actual vs expected house edge · honours the trend window and date range</div>
+            <div id="gameHe-${index}" class="chart"></div>
+          </article>`;
         fragment.appendChild(article);
       });
       container.appendChild(fragment);
       types.forEach((game, index) => {
-        gameCharts.push({
-          he: echarts.init(document.getElementById(`gameHe-${index}`)),
-          prob: echarts.init(document.getElementById(`gameProb-${index}`))
-        });
+        gameCharts.push({ he: gameHeAvailable[index] ? echarts.init(document.getElementById(`gameHe-${index}`)) : null });
       });
     }
 
@@ -389,7 +392,7 @@ def build_dashboard():
       }));
       const breachesInView = perGame.reduce((sum, entry) => sum + entry.inView, 0);
       const byGame = perGame
-        .slice()
+        .filter(entry => entry.inView > 0)
         .sort((a, b) => b.inView - a.inView || a.game.game_type.localeCompare(b.game.game_type));
       charts.breachByGame.setOption({
         color: colors, tooltip: {
@@ -418,6 +421,7 @@ def build_dashboard():
       }
       const byPlace = (DATA.bet_places || [])
         .map(place => ({ place, inView: placeCounts[place.key] || 0 }))
+        .filter(entry => entry.inView > 0)
         .sort((a, b) => b.inView - a.inView || b.place.breaches - a.place.breaches || a.place.key.localeCompare(b.place.key));
       const placeChart = document.getElementById('breachByPlace');
       const desiredHeight = Math.min(1100, Math.max(350, byPlace.length * 18 + 90));
@@ -461,17 +465,41 @@ def build_dashboard():
         const expectedProb = timeframeMean(DATA.series_expected_probability, name);
         const threshold = timeframeMean(DATA.series_threshold, name);
         const breach = timeframeMean(DATA.series_breach, name);
+        const heAvailable = gameHeAvailable[index];
         document.getElementById(`gameMeta-${index}`).textContent =
-          `${Number(game.rows).toLocaleString()} rows · ${game.days} days on record · ${game.first_date} – ${game.last_date} · ${game.bet_places} bet places · the game row follows the trend window and date range; bet-place rows are full-history pooled means`;
-        const rows = [`<tr class="table-total"><td>${escapeHtml(name)} — all bet places</td><td>${daysInRange}</td><td>${number(actualHe)}</td><td>${number(expectedHe)}</td><td>${number(actualHe != null && expectedHe != null ? actualHe - expectedHe : null)}</td><td>${number(actualProb)}</td><td>${number(expectedProb)}</td><td>${number(threshold)}</td><td>${breach == null ? `${Number(game.breach_pct).toFixed(2)}%` : `${breach.toFixed(2)}%`}</td></tr>`];
+          `${Number(game.rows).toLocaleString()} rows · ${game.days} days on record · ${game.first_date} – ${game.last_date} · ${game.bet_places} bet places${heAvailable ? '' : ' · no house-edge model published for this game'} · the game row follows the trend window and date range; bet-place rows are full-history pooled means`;
+
+        const columns = heAvailable
+          ? ['Bet place', 'Days', 'Actual HE', 'Expected HE', 'HE delta', 'Actual prob.', 'Expected prob.', 'Threshold', 'Breach rows %']
+          : ['Bet place', 'Days', 'Actual prob.', 'Expected prob.', 'Threshold', 'Breach rows %'];
+        document.getElementById(`gameHead-${index}`).innerHTML = `<tr>${columns.map(column => `<th>${column}</th>`).join('')}</tr>`;
+        const cells = (label, days, he, prob, thresholdValue, breachValue) => {
+          const out = [`<td>${escapeHtml(label)}</td>`, `<td>${days}</td>`];
+          if (heAvailable) out.push(
+            `<td>${number(he.actual)}</td>`,
+            `<td>${number(he.expected)}</td>`,
+            `<td>${number(he.actual != null && he.expected != null ? he.actual - he.expected : null)}</td>`
+          );
+          out.push(
+            `<td>${number(prob.actual)}</td>`,
+            `<td>${number(prob.expected)}</td>`,
+            `<td>${number(thresholdValue)}</td>`,
+            `<td>${breachValue}</td>`
+          );
+          return out.join('');
+        };
+        const rows = [`<tr class="table-total">${cells(`${name} — all bet places`, daysInRange, { actual: actualHe, expected: expectedHe }, { actual: actualProb, expected: expectedProb }, threshold, breach == null ? `${Number(game.breach_pct).toFixed(2)}%` : `${breach.toFixed(2)}%`)}</tr>`];
         for (const place of (DATA.bet_places || []).filter(entry => entry.game_type === name)) {
-          rows.push(`<tr>
-            <td>${escapeHtml(place.bet_place)}</td><td>${place.days}</td>
-            <td>${number(place.mean_actual_he)}</td><td>${number(place.mean_expected_he)}</td><td>${number(place.mean_he_delta)}</td>
-            <td>${number(place.mean_actual_probability)}</td><td>${number(place.mean_expected_probability)}</td><td>${number(place.mean_threshold)}</td><td>${Number(place.breach_pct).toFixed(2)}%</td>
-          </tr>`);
+          rows.push(`<tr>${cells(place.bet_place, place.days, { actual: place.mean_actual_he, expected: place.mean_expected_he }, { actual: place.mean_actual_probability, expected: place.mean_expected_probability }, place.mean_threshold, `${Number(place.breach_pct).toFixed(2)}%`)}</tr>`);
         }
         document.getElementById(`gameRows-${index}`).innerHTML = rows.join('');
+
+        const hePoints = timeframeSeries(DATA.series_he, name).filter(([, value]) => value != null);
+        const card = document.getElementById(`gameHeCard-${index}`);
+        const hasHeToShow = heAvailable && hePoints.length > 0;
+        if (card) card.style.display = hasHeToShow ? '' : 'none';
+        if (!hasHeToShow) return;
+        if (!gameCharts[index].he) gameCharts[index].he = echarts.init(document.getElementById(`gameHe-${index}`));
         const line = (seriesByGame, label, color, dash) => ({
           name: label, type: 'line', showSymbol: false, smooth: true, connectNulls: false,
           data: timeframeSeries(seriesByGame, name).map(([day, value]) => [day, value]),
@@ -480,14 +508,6 @@ def build_dashboard():
         gameCharts[index].he.setOption({
           ...trendCommon, yAxis: { ...trendCommon.yAxis, name: 'HE (%)' },
           series: [ line(DATA.series_he, 'Actual HE', '#38bdf8'), line(DATA.series_expected_he, 'Expected HE', '#fbbf24', 'dashed') ]
-        }, true);
-        gameCharts[index].prob.setOption({
-          ...trendCommon, yAxis: { ...trendCommon.yAxis, name: 'Probability (%)' },
-          series: [
-            line(DATA.series_actual_probability, 'Actual probability', '#38bdf8'),
-            line(DATA.series_expected_probability, 'Expected probability', '#a78bfa', 'dashed'),
-            line(DATA.series_threshold, 'Threshold', '#fb7185', 'dotted')
-          ]
         }, true);
       });
     }
@@ -549,7 +569,7 @@ def build_dashboard():
       render();
     }
 
-    const allCharts = () => [...Object.values(charts), ...gameCharts.flatMap(entry => [entry.he, entry.prob])];
+    const allCharts = () => [...Object.values(charts), ...gameCharts.map(entry => entry.he).filter(chart => chart)];
 
     renderKpis();
     initDateRangeBounds();

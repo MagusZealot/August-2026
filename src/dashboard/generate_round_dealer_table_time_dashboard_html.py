@@ -1,0 +1,515 @@
+#!/usr/bin/env python3
+"""Generate the game-isolated Dealer & Table Pace Intelligence console."""
+from pathlib import Path
+import json
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+WORKSPACE = SCRIPT_DIR.parent.parent
+if not (WORKSPACE / "workspace_map.txt").exists():
+    for _parent in WORKSPACE.parents:
+        if (_parent / "workspace_map.txt").exists():
+            WORKSPACE = _parent
+            break
+
+WORKSPACE = Path(WORKSPACE)
+DATA_FILE = WORKSPACE / "output" / "round_dealer_table_time_data.json"
+OUT_FILE = WORKSPACE / "output" / "dashboards" / "round_dealer_table_time_dashboard.html"
+
+
+def _telemetry_rows(data):
+    """Normalize the combined pipeline's entity entries into the console schema."""
+    entity_entries = data.get("entity_entries")
+    if not isinstance(entity_entries, dict):
+        raise ValueError("Combined pace payload is missing its entity_entries object")
+
+    rows = []
+    for entity_id, entries in entity_entries.items():
+        if not isinstance(entries, list):
+            raise ValueError(f"Invalid telemetry entries for entity {entity_id!r}")
+        for entry in entries:
+            if not isinstance(entry, dict):
+                raise ValueError(f"Invalid telemetry record for entity {entity_id!r}")
+
+            source = entry.get("source")
+            if source not in ("dealer", "table"):
+                raise ValueError(f"Unknown telemetry source {source!r} for entity {entity_id!r}")
+
+            rows.append({
+                "BILLING_DATE": entry.get("date"),
+                "GAME_TYPE": entry.get("game_type"),
+                "DEALER": entity_id if source == "dealer" else None,
+                "TABLE_NO": entity_id if source == "table" else None,
+                "AVG_TIMEDIFF": entry.get("actual_duration"),
+                "STD_TIMEDIFF": entry.get("std_actual_duration"),
+            })
+    return rows
+
+
+def render_dashboard(data):
+    rows = _telemetry_rows(data)
+    meta = data.get("meta") or {}
+    console_data = {
+        "meta": {
+            "generated_at": meta.get("generated_at"),
+            "latest_file_date": meta.get("latest_file_date"),
+        },
+        "rows": rows,
+    }
+    payload = json.dumps(console_data, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
+
+    template = r"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dealer &amp; Table Pace Intelligence</title>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    :root { color-scheme: dark; font-family: Inter, "Segoe UI", sans-serif; background: #090e1a; color: #e2e8f0; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 320px; background: radial-gradient(ellipse at top, #14213a 0, #090e1a 55%); }
+    header { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; padding: 14px max(20px, calc((100vw - 1480px) / 2)); background: #0b1220ed; border-bottom: 1px solid #253247; backdrop-filter: blur(12px); }
+    h1 { margin: 0; font-size: clamp(18px, 2.4vw, 26px); letter-spacing: .02em; }
+    header p { margin: 5px 0 0; color: #93a4bc; font-size: 12px; }
+    .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+    select { min-width: 190px; padding: 9px 12px; border: 1px solid #344258; border-radius: 8px; background: #111b2d; color: #e2e8f0; font-family: inherit; font-size: 12px; }
+    main { max-width: 1480px; margin: auto; padding: 22px; }
+    .hero { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 18px; margin-bottom: 18px; }
+    .hero h2 { margin: 0; font-size: 18px; }
+    .hero p, .muted { color: #94a3b8; font-size: 12px; }
+    .hero p { max-width: 900px; margin-bottom: 0; line-height: 1.55; }
+    .kpis { display: grid; grid-template-columns: repeat(4, minmax(180px, 1fr)); gap: 10px; margin-bottom: 16px; }
+    .card { border: 1px solid #24334a; border-radius: 14px; background: linear-gradient(145deg, #121d30e8, #0c1423f2); box-shadow: 0 10px 30px #0002; }
+    .kpi { padding: 16px; }
+    .kpi label { display: block; margin-bottom: 8px; color: #91a2ba; font-size: 10px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
+    .kpi strong { font: 700 20px ui-monospace, Consolas, monospace; color: #f8fafc; }
+    .kpi .sub { display: block; margin-top: 6px; color: #64748b; font-size: 10px; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .chart-card { min-width: 0; padding: 15px; }
+    .chart-card h3 { margin: 0 0 3px; font-size: 14px; }
+    .chart { width: 100%; height: 360px; }
+    .wide { grid-column: 1 / -1; }
+    .watchlist { margin-bottom: 16px; padding: 16px; border-color: #7f1d1d; }
+    .watchlist h3 { margin: 0 0 4px; color: #fda4af; font-size: 15px; }
+    .watchlist .muted { margin: 0 0 12px; }
+    .watchlist table th { color: #fda4af; }
+    .watchlist table td { color: #fecdd3; }
+    .watchlist .action { color: #fbbf24; font-weight: 700; }
+    .table-wrap { overflow: auto; max-height: 680px; border: 1px solid #253247; border-radius: 10px; }
+    table { width: 100%; border-collapse: collapse; white-space: nowrap; font-size: 12px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #253247; text-align: right; }
+    th { position: sticky; top: 0; z-index: 1; background: #111b2d; color: #90a3bd; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+    td:first-child, th:first-child { text-align: left; }
+    tbody tr:hover { background: #17243a; }
+    .table-empty { padding: 18px 12px; color: #94a3b8; font-size: 12px; font-style: italic; text-align: left; }
+    footer { padding: 22px 0 8px; color: #77869c; font-size: 11px; }
+    @media (max-width: 900px) { .kpis { grid-template-columns: repeat(2, 1fr); } .grid { grid-template-columns: 1fr; } .wide { grid-column: auto; } }
+    @media (max-width: 560px) { main { padding: 14px; } .kpis { grid-template-columns: 1fr; } .chart { height: 300px; } header { padding-inline: 14px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1><i class="fa-solid fa-gauge-high" style="color:#34d399"></i> Dealer &amp; Table Pace Intelligence</h1>
+      <p id="feedStatus">Loading pace telemetry...</p>
+    </div>
+    <div class="filters">
+      <label class="muted" for="gameFilter">Game type (all views are isolated to this game)<br>
+        <select id="gameFilter" aria-label="Select game type"></select>
+      </label>
+    </div>
+  </header>
+  <main>
+    <section class="hero">
+      <div>
+        <h2>Operational Efficiency &amp; Pace Console</h2>
+        <p>Dealer speeds are compared only with the selected game's baseline. The source feed reports dealers and tables as separate observations, not dealer-table pairings; the matrix and rankings preserve that distinction rather than inventing matches.</p>
+      </div>
+    </section>
+    <section id="kpis" class="kpis" aria-label="Selected game key performance indicators"></section>
+    <section class="card watchlist" aria-labelledby="watchlistTitle">
+      <h3 id="watchlistTitle"><i class="fa-solid fa-triangle-exclamation"></i> Watchlist: Slow Dealers</h3>
+      <p class="muted">Action required for dealers slower than the selected game's baseline by at least 1.50 seconds or in its slowest 10%.</p>
+      <div class="table-wrap" id="watchlistTable"></div>
+    </section>
+    <section class="grid">
+      <article class="card chart-card">
+        <h3>Combined Efficiency Matrix</h3>
+        <div class="muted">Average time (speed) vs standard deviation (consistency), selected game only</div>
+        <div id="efficiencyMatrix" class="chart"></div>
+      </article>
+      <article class="card chart-card">
+        <h3>Dealer Speed Over Time</h3>
+        <div class="muted">Selected game's daily dealer baseline and up to five fastest and five slowest dealer trends</div>
+        <div id="dealerTrend" class="chart"></div>
+      </article>
+      <article class="card chart-card wide">
+        <h3>Top / Bottom 10 Dealer &amp; Table Profiles</h3>
+        <div class="muted">Fastest and slowest entity profiles by average time, ranked within the selected game only</div>
+        <div id="paceExtremes" class="chart"></div>
+      </article>
+      <article class="card chart-card wide">
+        <h3>Unified Performance Forensics</h3>
+        <div class="muted">All source telemetry records for the selected game</div>
+        <div class="table-wrap" id="forensicsTable"></div>
+      </article>
+    </section>
+    <footer>Source: combined daily dealer and table pace snapshots. Change the game selector to isolate all KPIs, charts, and tables to another game.</footer>
+  </main>
+  <script id="pace-console-data" type="application/json">__PAYLOAD__</script>
+  <script>
+    const DATA = JSON.parse(document.getElementById('pace-console-data').textContent);
+    const ROWS = Array.isArray(DATA.rows) ? DATA.rows : [];
+    const gameFilter = document.getElementById('gameFilter');
+    const getChartTheme = () => ({
+      textColor: '#94a3b8',
+      gridBorder: '#253247',
+      tooltipBg: '#0f172a',
+      tooltipBorder: '#334155',
+      tooltipText: '#f8fafc'
+    });
+    const theme = getChartTheme();
+    const palette = ['#38bdf8', '#34d399', '#fbbf24', '#c084fc', '#fb7185', '#2dd4bf', '#a3e635', '#f97316', '#818cf8', '#f472b6'];
+    const axisStyle = {
+      axisLabel: { color: theme.textColor },
+      axisLine: { lineStyle: { color: '#334155' } },
+      splitLine: { lineStyle: { color: theme.gridBorder, type: 'dashed' } }
+    };
+    const tooltipStyle = {
+      backgroundColor: theme.tooltipBg,
+      borderColor: theme.tooltipBorder,
+      textStyle: { color: theme.tooltipText, fontSize: 12 },
+      confine: true
+    };
+    const charts = {
+      efficiencyMatrix: echarts.init(document.getElementById('efficiencyMatrix')),
+      dealerTrend: echarts.init(document.getElementById('dealerTrend')),
+      paceExtremes: echarts.init(document.getElementById('paceExtremes'))
+    };
+    const allCharts = Object.values(charts);
+    const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[character]));
+    const num = value => value == null || value === '' || !Number.isFinite(Number(value)) ? null : Number(value);
+    const mean = values => {
+      const valid = values.map(num).filter(value => value != null);
+      return valid.length ? valid.reduce((sum, value) => sum + value, 0) / valid.length : null;
+    };
+    const fmt2 = value => num(value) == null ? 'N/A' : num(value).toFixed(2);
+    const safeCell = value => value ? escapeHtml(value) : 'N/A';
+    const selectedRows = () => ROWS.filter(row => row.GAME_TYPE === gameFilter.value);
+    const currentGameColor = gameType => palette[Math.max(0, [...new Set(ROWS.map(row => row.GAME_TYPE).filter(Boolean))].sort().indexOf(gameType)) % palette.length];
+
+    function summarizeProfiles(rows) {
+      const profiles = new Map();
+      rows.forEach(row => {
+        const dealer = row.DEALER ? String(row.DEALER) : '';
+        const tableNo = row.TABLE_NO ? String(row.TABLE_NO) : '';
+        if (!dealer && !tableNo) return;
+        const key = `${dealer}\u0000${tableNo}`;
+        if (!profiles.has(key)) {
+          profiles.set(key, { dealer, tableNo, avgValues: [], stdValues: [] });
+        }
+        const profile = profiles.get(key);
+        if (num(row.AVG_TIMEDIFF) != null) profile.avgValues.push(num(row.AVG_TIMEDIFF));
+        if (num(row.STD_TIMEDIFF) != null) profile.stdValues.push(num(row.STD_TIMEDIFF));
+      });
+      return [...profiles.values()].map(profile => ({
+        ...profile,
+        avg: mean(profile.avgValues),
+        std: mean(profile.stdValues),
+        label: profile.dealer && profile.tableNo
+          ? `${profile.dealer} · ${profile.tableNo}`
+          : profile.dealer ? `Dealer · ${profile.dealer}` : `Table · ${profile.tableNo}`
+      }));
+    }
+
+    function renderKpis(rows) {
+      const dealers = rows.filter(row => row.DEALER);
+      const globalAvg = mean(rows.map(row => row.AVG_TIMEDIFF));
+      const gameBaseline = mean(dealers.map(row => row.AVG_TIMEDIFF));
+      const stdBaseline = mean(rows.map(row => row.STD_TIMEDIFF));
+      const dealerCount = new Set(rows.map(row => row.DEALER).filter(Boolean)).size;
+      const tableCount = new Set(rows.map(row => row.TABLE_NO).filter(Boolean)).size;
+      const game = gameFilter.value || 'N/A';
+      const tiles = [
+        ['Global Average Pace', `${fmt2(globalAvg)} s`, `${game} only`],
+        ['Selected Game Baseline', `${fmt2(gameBaseline)} s`, 'Average dealer time for this game'],
+        ['Average Std Dev', `${fmt2(stdBaseline)} s`, 'Consistency baseline for this game'],
+        ['Active Fleet', `${dealerCount} / ${tableCount}`, `${dealerCount} dealers · ${tableCount} tables in this game`]
+      ];
+      document.getElementById('kpis').innerHTML = tiles.map(([label, value, sub]) =>
+        `<div class="card kpi"><label>${escapeHtml(label)}</label><strong>${value}</strong><span class="sub">${escapeHtml(sub)}</span></div>`
+      ).join('');
+
+      const generatedAt = DATA.meta && DATA.meta.generated_at;
+      document.getElementById('feedStatus').textContent = generatedAt
+        ? `Updated ${generatedAt} · ${game}`
+        : `Pace telemetry loaded · ${game}`;
+    }
+
+    function renderWatchlist(rows) {
+      const dealerRows = rows.filter(row => row.DEALER && num(row.AVG_TIMEDIFF) != null);
+      const baseline = mean(dealerRows.map(row => row.AVG_TIMEDIFF));
+      const grouped = new Map();
+      dealerRows.forEach(row => {
+        const dealer = String(row.DEALER);
+        if (!grouped.has(dealer)) grouped.set(dealer, []);
+        grouped.get(dealer).push(num(row.AVG_TIMEDIFF));
+      });
+      const dealerAvgs = [...grouped.entries()]
+        .map(([dealer, values]) => ({ dealer, avg: mean(values) }))
+        .filter(item => item.avg != null)
+        .sort((a, b) => a.avg - b.avg);
+      const slowDecileIndex = dealerAvgs.length
+        ? Math.max(0, Math.ceil(dealerAvgs.length * 0.9) - 1)
+        : -1;
+      const slowDecileFloor = slowDecileIndex >= 0 ? dealerAvgs[slowDecileIndex].avg : null;
+      const flagged = dealerAvgs.filter(item => {
+        const delta = item.avg - baseline;
+        return delta > 0 && (delta >= 1.5 || item.avg >= slowDecileFloor);
+      }).sort((a, b) => b.avg - a.avg);
+      const host = document.getElementById('watchlistTable');
+      if (!flagged.length) {
+        host.innerHTML = '<div class="table-empty">No dealers currently meet the selected-game slow-pace thresholds.</div>';
+        return;
+      }
+      const body = flagged.map(item => `<tr>
+        <td>${escapeHtml(item.dealer)}</td>
+        <td>${fmt2(item.avg)}</td>
+        <td>${fmt2(baseline)}</td>
+        <td>${fmt2(item.avg - baseline)}</td>
+        <td class="action">Review Mechanics</td>
+      </tr>`).join('');
+      host.innerHTML = `<table>
+        <thead><tr><th>Dealer Name</th><th>Avg Time (s)</th><th>Game Baseline (s)</th><th>Delta (s slower)</th><th>Recommended Action</th></tr></thead>
+        <tbody>${body}</tbody>
+      </table>`;
+    }
+
+    function renderEfficiencyMatrix(rows) {
+      const gameType = gameFilter.value;
+      const color = currentGameColor(gameType);
+      const points = summarizeProfiles(rows).filter(profile => profile.avg != null && profile.std != null);
+      charts.efficiencyMatrix.setOption({
+        color: [color],
+        tooltip: {
+          ...tooltipStyle,
+          trigger: 'item',
+          formatter: param => {
+            const profile = param.data.profile;
+            return `<strong>${escapeHtml(profile.label)}</strong><br>Dealer: ${safeCell(profile.dealer)}<br>Table No: ${safeCell(profile.tableNo)}<br>Game Type: ${escapeHtml(gameType)}<br>Avg Time: ${fmt2(profile.avg)} s<br>Std Dev: ${fmt2(profile.std)} s`;
+          }
+        },
+        legend: { top: 0, data: [gameType], textStyle: { color: theme.textColor, fontSize: 11 } },
+        grid: { left: 62, right: 22, top: 42, bottom: 54 },
+        xAxis: { type: 'value', name: 'AVG_TIMEDIFF · Speed (s)', nameLocation: 'middle', nameGap: 30, nameTextStyle: { color: theme.textColor, fontSize: 11 }, ...axisStyle },
+        yAxis: { type: 'value', name: 'STD_TIMEDIFF · Consistency (s)', nameTextStyle: { color: theme.textColor, fontSize: 11 }, ...axisStyle },
+        series: [{
+          name: gameType,
+          type: 'scatter',
+          symbolSize: 11,
+          itemStyle: { color, opacity: 0.85, borderColor: '#0f172a', borderWidth: 1 },
+          data: points.map(profile => ({
+            value: [profile.avg, profile.std],
+            symbol: profile.dealer && profile.tableNo ? 'circle' : profile.tableNo ? 'diamond' : 'circle',
+            profile
+          }))
+        }]
+      }, true);
+    }
+
+    function renderDealerTrend(rows) {
+      const dealerRows = rows.filter(row => row.DEALER && row.BILLING_DATE && num(row.AVG_TIMEDIFF) != null);
+      const gameType = gameFilter.value;
+      const dates = [...new Set(dealerRows.map(row => String(row.BILLING_DATE)))].sort();
+      const dailyValues = new Map();
+      const dealerDaily = new Map();
+      const dealerTotals = new Map();
+      dealerRows.forEach(row => {
+        const date = String(row.BILLING_DATE);
+        const dealer = String(row.DEALER);
+        if (!dailyValues.has(date)) dailyValues.set(date, []);
+        dailyValues.get(date).push(num(row.AVG_TIMEDIFF));
+        if (!dealerDaily.has(dealer)) dealerDaily.set(dealer, new Map());
+        const valuesByDate = dealerDaily.get(dealer);
+        if (!valuesByDate.has(date)) valuesByDate.set(date, []);
+        valuesByDate.get(date).push(num(row.AVG_TIMEDIFF));
+        if (!dealerTotals.has(dealer)) dealerTotals.set(dealer, []);
+        dealerTotals.get(dealer).push(num(row.AVG_TIMEDIFF));
+      });
+      const rankedDealers = [...dealerTotals.entries()]
+        .map(([dealer, values]) => ({ dealer, avg: mean(values) }))
+        .filter(item => item.avg != null)
+        .sort((a, b) => a.avg - b.avg);
+      const chosen = new Map();
+      rankedDealers.slice(0, 5).forEach(item => chosen.set(item.dealer, item));
+      rankedDealers.slice(-5).forEach(item => chosen.set(item.dealer, item));
+      const baselineColor = currentGameColor(gameType);
+      const series = [{
+        name: `${gameType} baseline`,
+        type: 'line',
+        data: dates.map(date => mean(dailyValues.get(date))),
+        showSymbol: false,
+        connectNulls: false,
+        lineStyle: { color: '#f8fafc', width: 4 },
+        itemStyle: { color: '#f8fafc' },
+        emphasis: { focus: 'series' }
+      }];
+      [...chosen.values()].forEach((item, index) => {
+        const daily = dealerDaily.get(item.dealer);
+        series.push({
+          name: item.dealer,
+          type: 'line',
+          data: dates.map(date => mean(daily.get(date) || [])),
+          showSymbol: false,
+          connectNulls: false,
+          lineStyle: { color: palette[index % palette.length], width: 2 },
+          itemStyle: { color: palette[index % palette.length] },
+          emphasis: { focus: 'series' }
+        });
+      });
+      charts.dealerTrend.setOption({
+        color: [baselineColor, ...palette],
+        tooltip: { ...tooltipStyle, trigger: 'axis', axisPointer: { type: 'line' },
+          formatter: params => [`<strong>${escapeHtml(params[0] ? params[0].axisValue : '')}</strong>`,
+            ...params.filter(item => item.value != null).map(item => `${escapeHtml(item.seriesName)}: ${fmt2(item.value)} s`)].join('<br>') },
+        legend: {
+          type: 'scroll',
+          top: 0,
+          textStyle: { color: theme.textColor, fontSize: 10 },
+          selected: Object.fromEntries(series.map(item => [item.name, item.name === `${gameType} baseline`]))
+        },
+        grid: { left: 60, right: 22, top: 54, bottom: 56 },
+        xAxis: { type: 'category', boundaryGap: false, data: dates, ...axisStyle, axisLabel: { ...axisStyle.axisLabel, rotate: dates.length > 16 ? 35 : 0 } },
+        yAxis: { type: 'value', name: 'AVG_TIMEDIFF (s)', nameTextStyle: { color: theme.textColor, fontSize: 11 }, ...axisStyle },
+        dataZoom: [{ type: 'inside' }, { type: 'slider', height: 16, bottom: 10 }],
+        markLine: { data: [{ type: 'average' }] },
+        series
+      }, true);
+    }
+
+    function renderPaceExtremes(rows) {
+      const profiles = summarizeProfiles(rows).filter(profile => profile.avg != null)
+        .map(profile => ({ ...profile, identity: `${profile.dealer}\u0000${profile.tableNo}` }))
+        .sort((a, b) => a.avg - b.avg);
+      const selected = new Map();
+      profiles.slice(0, 10).forEach(profile => selected.set(profile.identity, { ...profile, kind: 'fastest' }));
+      profiles.slice(-10).forEach(profile => {
+        const previous = selected.get(profile.identity);
+        selected.set(profile.identity, { ...profile, kind: previous ? 'both' : 'slowest' });
+      });
+      const entries = [...selected.values()];
+      const labels = entries.map(profile => profile.label);
+      charts.paceExtremes.setOption({
+        tooltip: { ...tooltipStyle, trigger: 'axis', axisPointer: { type: 'shadow' },
+          formatter: params => {
+            const profile = entries[params[0].dataIndex];
+            return `<strong>${escapeHtml(profile.label)}</strong><br>Dealer: ${safeCell(profile.dealer)}<br>Table No: ${safeCell(profile.tableNo)}<br>Game Type: ${escapeHtml(gameFilter.value)}<br>Avg Time: ${fmt2(profile.avg)} s<br>Std Dev: ${fmt2(profile.std)} s`;
+          }
+        },
+        grid: { left: 16, right: 62, top: 20, bottom: 12, containLabel: true },
+        xAxis: { type: 'value', name: 'AVG_TIMEDIFF (s)', nameTextStyle: { color: theme.textColor, fontSize: 11 }, ...axisStyle },
+        yAxis: { type: 'category', inverse: true, data: labels, ...axisStyle, axisLabel: { ...axisStyle.axisLabel, fontSize: 10 } },
+        series: [{
+          name: 'Average time',
+          type: 'bar',
+          barMaxWidth: 18,
+          data: entries.map(profile => ({
+            value: Number(profile.avg.toFixed(2)),
+            itemStyle: {
+              color: profile.kind === 'fastest' ? '#34d399' : profile.kind === 'slowest' ? '#fb7185' : '#fbbf24',
+              borderRadius: [0, 4, 4, 0]
+            }
+          })),
+          label: { show: true, position: 'right', color: theme.textColor, fontSize: 10, formatter: param => Number(param.value).toFixed(2) }
+        }]
+      }, true);
+    }
+
+    function renderForensics(rows) {
+      const host = document.getElementById('forensicsTable');
+      if (!rows.length) {
+        host.innerHTML = '<div class="table-empty">No telemetry records are available for this game.</div>';
+        return;
+      }
+      const sortedRows = [...rows].sort((a, b) => String(b.BILLING_DATE || '').localeCompare(String(a.BILLING_DATE || '')));
+      const body = sortedRows.map(row => `<tr>
+        <td>${row.BILLING_DATE ? escapeHtml(row.BILLING_DATE) : 'N/A'}</td>
+        <td>${row.GAME_TYPE ? escapeHtml(row.GAME_TYPE) : 'N/A'}</td>
+        <td>${row.DEALER ? escapeHtml(row.DEALER) : 'N/A'}</td>
+        <td>${row.TABLE_NO ? escapeHtml(row.TABLE_NO) : 'N/A'}</td>
+        <td>${num(row.AVG_TIMEDIFF) != null ? Number(row.AVG_TIMEDIFF).toFixed(2) : 'N/A'}</td>
+        <td>${num(row.STD_TIMEDIFF) != null ? Number(row.STD_TIMEDIFF).toFixed(2) : 'N/A'}</td>
+      </tr>`).join('');
+      host.innerHTML = `<table>
+        <thead><tr><th>Billing Date</th><th>Game Type</th><th>Dealer</th><th>Table No</th><th>Avg Time (s)</th><th>Std Dev (s)</th></tr></thead>
+        <tbody>${body}</tbody>
+      </table>
+      <div class="table-empty">${rows.length.toLocaleString()} selected-game telemetry records.</div>`;
+    }
+
+    function render() {
+      const rows = selectedRows();
+      renderKpis(rows);
+      renderWatchlist(rows);
+      renderEfficiencyMatrix(rows);
+      renderDealerTrend(rows);
+      renderPaceExtremes(rows);
+      renderForensics(rows);
+    }
+
+    const gameTypes = [...new Set(ROWS.map(row => row.GAME_TYPE).filter(game => typeof game === 'string' && game))].sort();
+    gameTypes.forEach(game => {
+      const option = document.createElement('option');
+      option.value = game;
+      option.textContent = game;
+      gameFilter.appendChild(option);
+    });
+    if (gameTypes.length) {
+      gameFilter.value = gameTypes[0];
+    } else {
+      gameFilter.disabled = true;
+    }
+    gameFilter.addEventListener('change', render);
+    render();
+
+    let resizePending = false;
+    function resizeCharts() {
+      if (resizePending) return;
+      resizePending = true;
+      requestAnimationFrame(() => {
+        allCharts.forEach(chart => chart.resize());
+        resizePending = false;
+      });
+    }
+    window.addEventListener('resize', resizeCharts);
+    if ('ResizeObserver' in window) {
+      const layoutObserver = new ResizeObserver(resizeCharts);
+      layoutObserver.observe(document.querySelector('main'));
+    }
+  </script>
+</body>
+</html>
+"""
+    return template.replace("__PAYLOAD__", payload)
+
+
+def build_dashboard():
+    if not DATA_FILE.exists():
+        raise FileNotFoundError(f"Combined pace data payload not found: {DATA_FILE}")
+
+    with open(DATA_FILE, "r", encoding="utf-8") as source:
+        data = json.load(source)
+
+    html = render_dashboard(data)
+    OUT_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(OUT_FILE, "w", encoding="utf-8") as output:
+        output.write(html)
+    print(f"Generated {OUT_FILE} ({len(html):,} characters)")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(build_dashboard())

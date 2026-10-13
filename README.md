@@ -7,13 +7,14 @@
 ## Quick Start
 
 ```bash
-# Run full 14-step pipeline
+# Run full 16-step pipeline
 py scripts/generate_all_dashboards.py
 
-# Output: Three interactive dashboards in output/dashboards/
+# Output: Four interactive dashboards in output/dashboards/
 # - bi_dashboard.html               (Main BI & Risk Intelligence Console)
 # - player_behavior_dashboard.html  (Player Behavioral Intelligence Console)
 # - game_probability_dashboard.html (Probability & HE Console)
+# - round_dealer_table_time_dashboard.html (Dealer & Table Pace Intelligence)
 ```
 
 > **Requires:** Python 3.8+ (`py` launcher on Windows). Raw data files must be in place first — see `data/README.md`.
@@ -30,11 +31,11 @@ August 2026/
 │   ├── raw/                          # 27 CSV exports (~9.5 GB)
 │   └── probability/                  # Daily HE/probability snapshots
 ├── scripts/                          # Pipeline entry points
-│   ├── generate_all_dashboards.py    # 14-step master wrapper
+│   ├── generate_all_dashboards.py    # 16-step master wrapper
 │   └── generate_chart.js
 ├── src/                              # All Python data scripts
-│   ├── ingest/                       # Raw-data ingestion & analysis (steps 1-8, 13)
-│   └── dashboard/                    # Dashboard data prep & rendering (steps 9-12, 14)
+│   ├── ingest/                       # Raw-data ingestion & analysis (steps 1-8, 13, 15)
+│   └── dashboard/                    # Dashboard data prep & rendering (steps 9-12, 14, 16)
 └── output/                           # GENERATED ARTIFACTS (gitignored)
     ├── dashboards/                   # Final HTML dashboards
     ├── data/                         # JSON payloads (indexes, behavior, dossiers)
@@ -44,7 +45,7 @@ August 2026/
 
 ---
 
-## Pipeline Steps (14 Total)
+## Pipeline Steps (16 Total)
 
 | Step | Script | Output |
 |------|--------|--------|
@@ -62,6 +63,8 @@ August 2026/
 | 12 | `inject_dossier_tabs.py` | Injects dossier system into behavior console |
 | 13 | `probability_he_ingest.py` | `game_probability_he_data.json` (refresh/backfill) |
 | 14 | `generate_probability_dashboard_html.py` | `game_probability_dashboard.html` |
+| 15 | `round_dealer_table_time_ingest.py` | `round_dealer_table_time_data.json` (combined dealer and table pace) |
+| 16 | `generate_round_dealer_table_time_dashboard_html.py` | `round_dealer_table_time_dashboard.html` |
 
 **Skip-guards:** Steps auto-skip when outputs exist and are newer than dependencies.
 
@@ -73,8 +76,9 @@ August 2026/
 flowchart TD
     RAW[("27 raw CSV exports<br/>data/raw/ · ~9.5 GB")]
     PROB[("Daily probability snapshots<br/>data/probability/")]
+    PACE_SOURCE[("Dealer + table daily pace snapshots<br/>data/round_dealer_time/ + data/round_table_time/")]
     CC["currency_converter.py<br/>shared PHP conversion + country map"]
-    WRAP["scripts/generate_all_dashboards.py<br/>14-step master wrapper · skip-guards · progress.json"]
+    WRAP["scripts/generate_all_dashboards.py<br/>16-step master wrapper · skip-guards · progress.json"]
 
     subgraph INGEST["src/ingest/ — ingestion & analysis"]
         S1["Step 1 · whale_tracking.py"]
@@ -86,6 +90,7 @@ flowchart TD
         S7["Step 7 · generate_player_behavior_data.py<br/>random 5 exports"]
         S8["Step 8 · build_individual_dossiers.py<br/>first 5 exports + derived CSVs"]
         S13["Step 13 · probability_he_ingest.py"]
+        S15["Step 15 · round_dealer_table_time_ingest.py<br/>dealer + table pace snapshots"]
     end
 
     subgraph DASH["src/dashboard/ — dashboard prep & rendering"]
@@ -94,6 +99,7 @@ flowchart TD
         S11["Step 11 · generate_behavior_dashboard_html.py"]
         S12["Step 12 · inject_dossier_tabs.py"]
         S14["Step 14 · generate_probability_dashboard_html.py"]
+        S16["Step 16 · generate_round_dealer_table_time_dashboard_html.py"]
     end
 
     RAW --> S1
@@ -105,6 +111,7 @@ flowchart TD
     RAW --> S7
     RAW --> S8
     PROB --> S13
+    PACE_SOURCE --> S15
 
     CC -.-> S1
     CC -.-> S2
@@ -128,6 +135,7 @@ flowchart TD
     S7 --> BEH[/"player_behavior_data.json"/]
     S8 --> IND[/"individual_dossiers_data.json<br/>42 players + 35 operators"/]
     S13 --> PJ[/"game_probability_he_data.json"/]
+    S15 --> PACE[/"round_dealer_table_time_data.json"/]
 
     CSVW --> S9
     CSVT --> S9
@@ -149,10 +157,13 @@ flowchart TD
 
     PJ --> S14
     S14 --> PD[/"game_probability_dashboard.html<br/>Probability & HE Console"/]
+    PACE --> S16
+    S16 --> PCD[/"round_dealer_table_time_dashboard.html<br/>Dealer & Table Pace Intelligence"/]
 
-    BI --> RT["Browser runtime<br/>three cross-linked consoles"]
+    BI --> RT["Browser runtime<br/>four linked consoles"]
     PBD --> RT
     PD --> RT
+    PCD --> RT
     RT -.->|"lazy-load on player-card click"| CH
 ```
 
@@ -168,7 +179,8 @@ flowchart TD
 - **Monthly Activity Calendar**: Interactive calendar showing active days with 24-hour bet breakdowns
 - **Whale & Chaser Group Dossiers**: Aggregate KPIs, risk tier distributions, behavioral archetypes
 - **Currency Standardization**: All amounts converted to PHP using date-relative historical rates (frankfurter.app)
-- **Three Linked Dashboards**: Cross-navigation between BI, Behavior, and Probability consoles
+- **Four Linked Dashboards**: Cross-navigation between BI, Behavior, Probability, and Dealer & Table Pace consoles
+- **Dealer & Table Pace Intelligence**: Combined dealer/table feed with strict game-type isolation across KPIs, charts, slow-dealer watchlist, and performance forensics; dealer and table observations remain distinct because the source does not provide dealer-table pairings
 - **Tabbed Trend Views + Date Range Selector**: On the Probability & HE console, the "HE trend for selected game" and "Probability and threshold trend" charts are consolidated into one tabbed panel (same `.tab-pane` / active-highlight pattern as the BI console). Start Date and End Date inputs sit alongside the existing game/period filters and dynamically filter both trend tabs plus the "Average actual vs expected HE by game" and "Probability vs expected probability and threshold" comparison charts (which re-average the pooled daily values over the selected days; unfiltered values are unchanged). A Reset button clears the range.
 
 ---
@@ -176,7 +188,7 @@ flowchart TD
 ## Documentation
 
 - **`workspace_map.txt`** — Complete technical reference (folder tree, script parameters, data flow, architecture, recent changes, file discovery behavior)
-- **`data/README.md`** — Raw data file requirements, placement, and glob-based discovery behavior
+- **`data/README.md`** — Raw data file requirements, placement, glob-based discovery behavior, and the combined dealer/table pace snapshot feeds
 
 ---
 
@@ -191,6 +203,7 @@ Ingestion scripts use **glob patterns** to discover raw CSV files in `data/raw/`
 | Step 7 (`generate_player_behavior_data`) | Random 5 `*EXPORT_CSV*.csv` (sampled via `random.sample()`) | **5 randomly sampled** |
 | Step 8 (`build_individual_dossiers`) | First 5 exports + derived CSVs | **Only first 5** exports |
 | Step 13 (`probability_he_ingest`) | `mnt_game_probability_he_YYYYMMDD.csv` in `data/probability/` | **All** daily snapshots |
+| Step 15 (`round_dealer_table_time_ingest`) | Dealer and table daily pace snapshots cached in `data/round_dealer_time/` and `data/round_table_time/` | **All available** dealer and table snapshots |
 
 **Adding more raw exports:** Steps 1-6 and 13 automatically process new files on next run. Steps 7-8 remain limited to 5 exports for performance (Step 7 uses random sampling for representativeness). Skip-guards use file modification times — new files trigger reprocessing of dependent steps.
 

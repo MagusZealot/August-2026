@@ -1002,4 +1002,80 @@ pair of axes.
    per-game HE charts; breach and quick-nav regressions still green).
 
 ==============================================================================
+   14. RECENT UPDATE (2026-10-13) — UI CLEANUP: CONDITIONAL HE + BREACH CHARTS
+==============================================================================
+
+Follow-up to section 13 on output\dashboards\game_probability_dashboard.html
+(generator: src\dashboard\generate_probability_dashboard_html.py; no payload
+change).
+
+1. REMOVED: every per-game "Probability and threshold trend" chart — the second
+   card of each game section (gameProb-<i> div, ECharts instance, setOption and
+   the nested .grid that paired the two cards). Each game section is now a
+   standard single-view container: heading, meta caption, table, then one
+   full-width .chart-card.single "<GAME> - HE Trend" chart. (The old tabbed
+   trend panel from section 9 was already gone; nothing tab-related remains.)
+   The Combined Summary charts probCompare and combinedProb are untouched.
+
+2. CONDITIONAL HE TREND CHARTS: buildGameSections() computes
+   gameHeAvailable[index] = game.mean_actual_he != null AND series_he has at
+   least one non-null point. Games without HE data get NO ECharts instance
+   (gameCharts[i].he === null) and their wrapper <article
+   id="gameHeCard-<i>"> is generated with style="display:none". At render time
+   renderGameSections() re-evaluates the window-filtered points: the wrapper is
+   shown/hidden and setOption is skipped whenever the visible timeframe has no
+   HE points (e.g. SICBO, whose HE series only spans 2025-01-25..2025-05-03,
+   disappears under the default 90-day window and returns under "all" dates).
+   allCharts() filters out the null instances so resize stays safe.
+
+3. CONDITIONAL TABLE COLUMNS: the per-game <thead> is now built dynamically
+   (gameHead-<i>). Games without usable HE data drop the "Actual HE",
+   "Expected HE" and "HE delta" columns from the header AND from every row
+   (6-cell rows instead of 9) — BULL BULL (mean_actual_he null, 0/599 series
+   points, no HE model published) renders that way, and its meta caption notes
+   "no house-edge model published for this game".
+
+4. ZERO-BREACH FILTERING: the two breach charts now filter before hitting
+   ECharts — byGame keeps only games with in-view breaches > 0 and byPlace only
+   betting areas with in-view breaches > 0 (axes, bars, labels, tooltips and
+   the dynamic byPlace height all derive from the filtered arrays). Under the
+   default 90-day window that is 5 games; under "all" dates 7 games (the
+   zero-breach "Classic DT" alias drops out) and 61 of 111 betting areas.
+   Tooltips still show full-history totals for the listed entries.
+
+5. VERIFICATION: node --check; stubbed DOM/ECharts smoke test — 30/30 checks
+   pass (15 chart instances: 8 static + 7 per-game HE, BULL BULL skipped;
+   wrapper visibility matches in-window HE points incl. the SICBO hide/reveal
+   cases; BULL BULL 6-cell rows and 6-column head vs ROULETTE's 9; breach
+   charts exclude zero-breach games/areas across 7-day, 90-day and "all"
+   windows, stay sorted descending, and the byPlace height matches the filtered
+   count).
+
+==============================================================================
+
+==============================================================================
+   15. RECENT UPDATE (2026-10-13) — UNIFIED DEALER & TABLE PACE CONSOLE
+==============================================================================
+
+The master dashboard pipeline now uses one combined pace data source and one
+dashboard generator:
+
+  - Pipeline step 15: src\ingest\round_dealer_table_time_ingest.py writes
+    output\round_dealer_table_time_data.json from the dealer and table daily
+    snapshots cached in data\round_dealer_time\ and data\round_table_time\.
+  - Pipeline step 16: src\dashboard\generate_round_dealer_table_time_dashboard_html.py
+    writes output\dashboards\round_dealer_table_time_dashboard.html.
+  - The console payload maps each observation to BILLING_DATE, GAME_TYPE,
+    DEALER, TABLE_NO, AVG_TIMEDIFF and STD_TIMEDIFF. Dealer and table source
+    rows remain distinct; the source does not provide dealer-table pairings.
+  - A GAME_TYPE selector scopes every KPI, chart and table to one game.
+    Dashboard features include selected-game dealer trends and baseline,
+    slow-dealer watchlist, efficiency matrix, pace extremes and one forensics
+    table. ECharts use getChartTheme() styling and resize on layout changes.
+  - The standalone round_dealer_time_dashboard.html and
+    round_table_time_dashboard.html outputs, plus their two dashboard HTML
+    generator scripts, have been retired. The standalone ingest scripts remain
+    in src\ingest\ but are not part of the master pipeline.
+
+==============================================================================
 EOF

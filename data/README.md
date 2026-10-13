@@ -41,6 +41,15 @@ Daily published CSV snapshots from the probability feed.
 
 Each snapshot is under 100 KB.
 
+### Dealer and table pace snapshots
+The combined dealer/table pace ingest automatically fetches daily dealer and
+table snapshots and caches them in `round_dealer_time/` and
+`round_table_time/`, respectively. The unified pipeline combines these feeds
+into `output/round_dealer_table_time_data.json` and generates
+`output/dashboards/round_dealer_table_time_dashboard.html`. Dealer and table
+records are distinct source observations; the feed does not provide dealer-to-
+table pairings. The standalone dealer and table dashboards have been retired.
+
 ---
 
 ## Data Flow Overview
@@ -49,14 +58,17 @@ Each snapshot is under 100 KB.
 flowchart TD
     RAW[("raw/<br/>27 CSV exports · ~9.5 GB<br/>300-377 MB each")]
     PROB[("probability/<br/>daily HE snapshots<br/>2025-01-31 → present")]
+    PACE[("round_dealer_time/ + round_table_time/<br/>cached daily dealer + table pace snapshots")]
 
-    RAW --> PIPE["14-step pipeline<br/>py scripts/generate_all_dashboards.py"]
+    RAW --> PIPE["16-step pipeline<br/>py scripts/generate_all_dashboards.py"]
     PROB --> PIPE
+    PACE --> PIPE
 
     PIPE --> REPORTS[/"output/reports/<br/>whale · chaser · operator<br/>heatmap · time-series CSVs"/]
     PIPE --> DATA[/"output/data/<br/>player indexes · behavior<br/>dossier payloads"/]
     PIPE --> CHUNKS[/"output/chunks/<br/>trajectory chunks · ~180 MB"/]
-    PIPE --> DASH[/"output/dashboards/<br/>bi_dashboard.html<br/>player_behavior_dashboard.html<br/>game_probability_dashboard.html"/]
+    PIPE --> DASH[/"output/dashboards/<br/>bi_dashboard.html<br/>player_behavior_dashboard.html<br/>game_probability_dashboard.html<br/>round_dealer_table_time_dashboard.html"/]
+    PIPE --> PACE_OUT[/"output/round_dealer_table_time_data.json"/]
     PIPE --> PROGRESS[/"output/progress/<br/>progress.json (live status)"/]
 ```
 

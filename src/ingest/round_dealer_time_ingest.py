@@ -177,8 +177,8 @@ def parse_snapshot(path):
                 "date": bd,
                 "game_type": gt,
                 "dealer": ds,
-                "actual_duration": av,   # AVG_TIMEDIFF = actual mean round duration
-                "expected_duration": sv, # STD_TIMEDIFF used as expected proxy
+                "actual_duration": av,        # AVG_TIMEDIFF = actual mean round duration
+                "std_actual_duration": sv,    # STD_TIMEDIFF = standard deviation of round durations
                 "updated_at": (raw.get("updated_at") or "").strip(),
             })
     return rows
@@ -211,65 +211,30 @@ def rnd(v, digits=2):
 # ---------------------------------------------------------------------------
 
 def build_dealer_trajectories(records):
-    """Build per-dealer trajectory across all dates and game types.
-    
-    Returns:
-      dealer_entries: dict dealer_id -> list of {date, game_type, actual, expected, delta}
-      game_dealer_map: dict game_type -> dict dealer_id -> [records...]
-    """
-    # Group by (dealer, game_type) to get per-dealer-per-game history
-    dealer_game_keys = defaultdict(list)  # (dealer, game_type) -> [row, ...]
+    """Build per-dealer trajectory across all dates and game types."""
+    dealer_game_keys = defaultdict(list)
     for r in records:
         dealer_game_keys[(r["dealer"], r["game_type"])].append(r)
 
-    dealer_entries = defaultdict(list)  # dealer_id -> [entry, ...]
-    game_dealer_map = defaultdict(lambda: defaultdict(list))  # game_type -> dealer_id -> [row, ...]
+    dealer_entries = defaultdict(list)
 
     for (dealer, game_type), sublist in dealer_game_keys.items():
-        # Sort by date to get time series
         sublist.sort(key=lambda r: r["date"])
-        game_dealer_map[game_type][dealer] = sublist
-
-        # Build trajectory entries for this dealer+game
-        for i, r in enumerate(sublist):
-            # Find previous record for delta calculation
-            prev = sublist[i - 1] if i > 0 else None
-            delta = None
-            if prev is not None and r["actual_duration"] is not None and prev["actual_duration"] is not None:
-                delta = round(r["actual_duration"] - prev["actual_duration"], 4)
-
+        for r in sublist:
             dealer_entries[dealer].append({
                 "date": r["date"],
                 "game_type": game_type,
-                "actual_duration": r["actual_duration"],
-                "expected_duration": r["expected_duration"],
-                "duration_delta": delta,
+                "actual_duration": rnd(r["actual_duration"]),
+                "expected_duration": rnd(r.get("expected_duration")),
+                "std_actual_duration": rnd(r["std_actual_duration"]),
+                "duration_delta": rnd(r.get("duration_delta")),
+                "is_breach": r.get("is_breach", False),
             })
 
-        # Also aggregate per-dealer (across all games) entries
-        for r in sublist:
-            dealer_entries[r["dealer"]].append({
-                "date": r["date"],
-                "game_type": game_type,
-                "actual_duration": r["actual_duration"],
-                "expected_duration": r["expected_duration"],
-                "duration_delta": None,  # will be computed below
-            })
-
-    # Compute cross-game deltas per dealer
     for dealer_id, entries in dealer_entries.items():
-        # Sort by date then game_type
         entries.sort(key=lambda e: (e["date"], e["game_type"]))
-        # Compute delta from previous entry (any game)
-        for i in range(1, len(entries)):
-            prev = entries[i - 1]
-            cur = entries[i]
-            if cur["actual_duration"] is not None and prev["actual_duration"] is not None:
-                cur["cross_game_delta"] = round(cur["actual_duration"] - prev["actual_duration"], 4)
-            else:
-                cur["cross_game_delta"] = None
 
-    return dict(dealer_entries), dict(game_dealer_map)
+    return dict(dealer_entries)
 
 
 def build_data_quality(rows, dates, game_types, meta):
@@ -290,7 +255,7 @@ def build_data_quality(rows, dates, game_types, meta):
                 "first_date": min(r["date"] for r in sub),
                 "last_date": max(r["date"] for r in sub),
                 "null_actual_duration": sum(1 for r in sub if r["actual_duration"] is None),
-                "null_expected_duration": sum(1 for r in sub if r["expected_duration"] is None),
+                "null_std_duration": sum(1 for r in sub if r["std_actual_duration"] is None),
             }
         duplicate_feeds.append({
             "normalized": up,
@@ -316,7 +281,7 @@ def build_data_quality(rows, dates, game_types, meta):
     coverage.sort(key=lambda c: c["coverage_pct"])
 
     null_fields = {}
-    for field in ("actual_duration", "expected_duration"):
+    for field in ("actual_duration", "std_actual_duration"):
         n = sum(1 for r in rows if r[field] is None)
         null_fields[field] = {"rows": n, "pct": round(n / len(rows) * 100, 2) if rows else 0.0}
 
@@ -328,59 +293,97 @@ def build_data_quality(rows, dates, game_types, meta):
 
 
 def build_payload(records, meta_extra):
-    """Aggregate the deduplicated record set into the dashboard payload.
-    
-    Enhanced with per-dealer trajectories and dealer-level summaries.
-    """
+    """Aggregate the deduplicated record set into the dashboard payload."""
     by_key = {}
     for r in records:
         k = (r["date"], r["game_type"], r["dealer"])
         prev = by_key.get(k)
-        if prev is None or r["updated_at"] > prev["updated_at"]:
+        if prev is None or r.get("updated_at", "") > prev.get("updated_at", ""):
             by_key[k] = r
     rows = list(by_key.values())
+    rows.sort(key=lambda r: (r["date"], r["game_type"], r["dealer"]))
 
-    # Build per-dealer trajectories
-    dealer_entries, game_dealer_map = build_dealer_trajectories(records)
+    dates = sorted({r["date"] for r in rows})
+    game_types = sorted({r["game_type"] for r in rows})
+    dealers = sorted({r["dealer"] for r in rows})
 
+    # Compute benchmarks per game type
+    game_benchmarks = {}
+    for gt in game_types:
+        sub_act = [r["actual_duration"] for r in rows if r["game_type"] == gt and r["actual_duration"] is not None]
+        sub_std = [r["std_actual_duration"] for r in rows if r["game_type"] == gt and r["std_actual_duration"] is not None]
+        m_act = mean(sub_act) or 0.0
+        m_std = mean(sub_std) or 0.0
+        thresh = round(m_act + m_std, 4)
+        game_benchmarks[gt] = {
+            "expected_duration": m_act,
+            "expected_std": m_std,
+            "threshold": thresh,
+        }
+
+    # Tag rows with expected duration, threshold, delta, and breach
     for r in rows:
+        bm = game_benchmarks.get(r["game_type"], {"expected_duration": 0.0, "threshold": 9999.0})
+        r["expected_duration"] = bm["expected_duration"]
+        r["threshold"] = bm["threshold"]
         r["duration_delta"] = (
-            round(r["actual_duration"] - r["expected_duration"], 4)
-            if r["actual_duration"] is not None and r["expected_duration"] is not None
+            round(r["actual_duration"] - bm["expected_duration"], 4)
+            if r["actual_duration"] is not None
             else None
         )
+        r["is_breach"] = (
+            r["actual_duration"] > bm["threshold"]
+            if r["actual_duration"] is not None
+            else False
+        )
 
-    rows.sort(key=lambda r: (r["date"], r["game_type"], r["dealer"]))
-    dates = sorted({r["date"] for r in records})
-    game_types = sorted({r["game_type"] for r in records})
-    dealers = sorted({r["dealer"] for r in records})
+    # Build per-dealer trajectories using deduplicated rows
+    dealer_entries = build_dealer_trajectories(rows)
+
     meta_extra["unique_keys"] = len(rows)
 
     # Per-game summaries
     gt_summary = []
     for gt in game_types:
-        sub = [r for r in records if r["game_type"] == gt]
+        sub = [r for r in rows if r["game_type"] == gt]
         sub_dates = sorted({r["date"] for r in sub})
         adur = [r["actual_duration"] for r in sub if r["actual_duration"] is not None]
-        edur = [r["expected_duration"] for r in sub if r["expected_duration"] is not None]
-        breaches = sum(
-            1 for r in sub
-            if r["actual_duration"] is not None
-            and r["expected_duration"] is not None
-            and r["actual_duration"] > r["expected_duration"]
-        )
+        sdur = [r["std_actual_duration"] for r in sub if r["std_actual_duration"] is not None]
+        deltas = [r["duration_delta"] for r in sub if r["duration_delta"] is not None]
+        breaches = sum(1 for r in sub if r["is_breach"])
+        bm = game_benchmarks[gt]
+
+        # Top dealers for this game
+        dealer_sub = defaultdict(list)
+        for r in sub:
+            dealer_sub[r["dealer"]].append(r)
+        top_dealers = []
+        for did, d_rows in dealer_sub.items():
+            top_dealers.append({
+                "dealer_id": did,
+                "mean_actual": rnd(mean([r["actual_duration"] for r in d_rows])),
+                "mean_expected": rnd(bm["expected_duration"]),
+                "mean_std": rnd(mean([r["std_actual_duration"] for r in d_rows])),
+                "breach_pct": round(sum(1 for r in d_rows if r["is_breach"]) / len(d_rows) * 100, 2),
+                "rows": len(d_rows),
+            })
+        top_dealers.sort(key=lambda x: (x["mean_actual"] or 0), reverse=True)
+
         gt_summary.append({
             "game_type": gt,
             "rows": len(sub),
             "days": len(sub_dates),
-            "first_date": sub_dates[0],
-            "last_date": sub_dates[-1],
+            "first_date": sub_dates[0] if sub_dates else None,
+            "last_date": sub_dates[-1] if sub_dates else None,
             "dealers": len({r["dealer"] for r in sub}),
-            "mean_actual_duration": mean(adur),
-            "mean_expected_duration": mean(edur),
-            "mean_duration_delta": mean([r["duration_delta"] for r in sub if r["duration_delta"] is not None]),
+            "mean_actual_duration": rnd(mean(adur)),
+            "mean_expected_duration": rnd(bm["expected_duration"]),
+            "mean_std_duration": rnd(mean(sdur)),
+            "mean_duration_delta": rnd(mean(deltas)),
+            "threshold": rnd(bm["threshold"]),
             "breaches": breaches,
             "breach_pct": round(breaches / len(sub) * 100, 2) if sub else 0.0,
+            "top_dealers": top_dealers[:10],
         })
     gt_summary.sort(key=lambda g: (-g["rows"], g["game_type"]))
 
@@ -392,73 +395,75 @@ def build_payload(records, meta_extra):
             continue
         all_adur = [e["actual_duration"] for e in d_entries if e["actual_duration"] is not None]
         all_edur = [e["expected_duration"] for e in d_entries if e["expected_duration"] is not None]
-        total_breaches = sum(
-            1 for e in d_entries
-            if e["actual_duration"] is not None
-            and e["expected_duration"] is not None
-            and e["actual_duration"] > e["expected_duration"]
+        all_sdur = [e["std_actual_duration"] for e in d_entries if e["std_actual_duration"] is not None]
+        total_breaches = sum(1 for e in d_entries if e["is_breach"])
+        trend = (
+            round(d_entries[-1]["actual_duration"] - d_entries[0]["actual_duration"], 2)
+            if len(d_entries) > 1 and d_entries[0]["actual_duration"] is not None and d_entries[-1]["actual_duration"] is not None
+            else None
         )
         dealer_summaries.append({
             "dealer_id": dealer_id,
             "total_rows": len(d_entries),
             "date_range": f"{d_entries[0]['date']} – {d_entries[-1]['date']}",
             "games_count": len({e["game_type"] for e in d_entries}),
-            "mean_actual_duration": mean(all_adur),
-            "mean_expected_duration": mean(all_edur),
+            "mean_actual_duration": rnd(mean(all_adur)),
+            "mean_expected_duration": rnd(mean(all_edur)),
+            "mean_std_duration": rnd(mean(all_sdur)),
             "total_breaches": total_breaches,
             "breach_pct": round(total_breaches / len(d_entries) * 100, 2) if d_entries else 0.0,
-            "recent_trend": d_entries[-1]["actual_duration"] - d_entries[0]["actual_duration"] if len(d_entries) > 1 and d_entries[0]["actual_duration"] is not None and d_entries[-1]["actual_duration"] is not None else None,
+            "recent_trend": trend,
         })
-    dealer_summaries.sort(key=lambda d: d["mean_actual_duration"], reverse=True)
+    dealer_summaries.sort(key=lambda d: (d["mean_actual_duration"] or 0), reverse=True)
 
     # Series data per game type (for charts)
     series_duration = {gt: [] for gt in game_types}
+    series_expected_duration = {gt: [] for gt in game_types}
     series_breach = {gt: [] for gt in game_types}
     daily = []
 
     for d in dates:
-        day_rows = [r for r in records if r["date"] == d]
+        day_rows = [r for r in rows if r["date"] == d]
+        day_actuals = [r["actual_duration"] for r in day_rows if r["actual_duration"] is not None]
+        day_expecteds = [r["expected_duration"] for r in day_rows if r["expected_duration"] is not None]
+        day_stds = [r["std_actual_duration"] for r in day_rows if r["std_actual_duration"] is not None]
+        day_deltas = [r["duration_delta"] for r in day_rows if r["duration_delta"] is not None]
+        day_breaches = sum(1 for r in day_rows if r["is_breach"])
+
         entry = {
             "date": d,
             "samples": len(day_rows),
-            "breaches": sum(
-                1 for r in day_rows
-                if r["actual_duration"] is not None
-                and r["expected_duration"] is not None
-                and r["actual_duration"] > r["expected_duration"]
-            ),
-            "mean_actual_duration": mean([r["actual_duration"] for r in day_rows]),
-            "mean_expected_duration": mean([r["expected_duration"] for r in day_rows]),
-            "mean_duration_delta": mean([r["duration_delta"] for r in day_rows if r["duration_delta"] is not None]),
+            "breaches": day_breaches,
+            "mean_actual_duration": rnd(mean(day_actuals)),
+            "mean_expected_duration": rnd(mean(day_expecteds)),
+            "mean_std_duration": rnd(mean(day_stds)),
+            "mean_duration_delta": rnd(mean(day_deltas)),
+            "breach_pct": round(day_breaches / len(day_rows) * 100, 2) if day_rows else 0.0,
         }
-        entry["breach_pct"] = round(entry["breaches"] / len(day_rows) * 100, 2) if day_rows else 0.0
         daily.append(entry)
 
         for gt in game_types:
             gt_day = [r for r in day_rows if r["game_type"] == gt]
             if not gt_day:
                 continue
-            series_duration[gt].append([d, mean([r["actual_duration"] for r in gt_day])])
-            series_breach[gt].append([d, round(sum(1 for r in gt_day if r["actual_duration"] > r["expected_duration"]) / len(gt_day) * 100, 2) if gt_day else 0.0])
+            series_duration[gt].append([d, rnd(mean([r["actual_duration"] for r in gt_day]))])
+            series_expected_duration[gt].append([d, rnd(mean([r["expected_duration"] for r in gt_day]))])
+            series_breach[gt].append([d, round(sum(1 for r in gt_day if r["is_breach"]) / len(gt_day) * 100, 2) if gt_day else 0.0])
 
     latest_date = dates[-1] if dates else None
     latest_rows = []
     if latest_date:
-        for r in sorted([r for r in records if r["date"] == latest_date], key=lambda r: (r["game_type"], r["dealer"])):
+        for r in sorted([r for r in rows if r["date"] == latest_date], key=lambda r: (r["game_type"], r["dealer"])):
             latest_rows.append({
                 "game_type": r["game_type"],
                 "dealer": r["dealer"],
                 "actual_duration": rnd(r["actual_duration"]),
                 "expected_duration": rnd(r["expected_duration"]),
+                "std_actual_duration": rnd(r["std_actual_duration"]),
                 "duration_delta": rnd(r["duration_delta"]),
+                "threshold": rnd(r["threshold"]),
+                "is_breach": r["is_breach"],
             })
-
-    # Breach dealers - dealers with highest breach rates
-    breach_dealers = sorted(
-        [d for d in dealer_summaries if d["breach_pct"] > 0],
-        key=lambda d: d["breach_pct"],
-        reverse=True,
-    )[:20]
 
     data_quality = build_data_quality(rows, dates, game_types, meta_extra)
 
@@ -467,11 +472,11 @@ def build_payload(records, meta_extra):
         "game_types": gt_summary,
         "dealers": dealer_summaries,
         "series_duration": series_duration,
+        "series_expected_duration": series_expected_duration,
         "series_breach": series_breach,
         "daily": daily,
         "latest_day": {"billing_date": latest_date, "rows": latest_rows},
-        "dealer_entries": dealer_entries,  # per-dealer trajectory data
-        "game_dealer_map": game_dealer_map,  # game_type -> dealer -> records
+        "dealer_entries": dealer_entries,
         "data_quality": data_quality,
         "missing_dates": meta_extra.get("files_missing", []),
     }
@@ -571,13 +576,14 @@ def main():
         "rows_raw": len(records),
         "game_types": sorted({r["game_type"] for r in records}),
         "dealers_tracked": len({r["dealer"] for r in records}),
-        "null_duration_rows": sum(1 for r in records if r["actual_duration"] is None or r["expected_duration"] is None),
+        "null_duration_rows": sum(1 for r in records if r["actual_duration"] is None or r["std_actual_duration"] is None),
         "dealer_entries_count": len({r["dealer"] for r in records}),
         "he_significant_delta": 5.0,
-        "prob_breach_rule": "actual_duration > expected_duration",
+        "prob_breach_rule": "actual_duration > threshold (mean + 1 std)",
     }
 
     payload = build_payload(records, meta)
+    meta["rows_raw"] = payload["meta"]["unique_keys"]
 
     with open(OUT_FILE, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))

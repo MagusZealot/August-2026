@@ -18,8 +18,8 @@ Runs the complete data pipeline in dependency order:
   12. inject_dossier_tabs.py             -> injects dossier system into behavior console
   13. probability_he_ingest.py           -> output/game_probability_he_data.json (always refreshes)
   14. generate_probability_dashboard_html.py -> output/dashboards/game_probability_dashboard.html
-  15. round_dealer_time_ingest.py        -> output/round_dealer_time_data.json
-  16. generate_round_dealer_time_dashboard_html.py -> output/dashboards/round_dealer_time_dashboard.html
+  15. round_dealer_table_time_ingest.py  -> output/round_dealer_table_time_data.json
+  16. generate_round_dealer_table_time_dashboard_html.py -> output/dashboards/round_dealer_table_time_dashboard.html
 
 All scripts use hardcoded absolute paths under the workspace root, so they are
 invoked as standalone processes from the workspace working directory.
@@ -62,14 +62,10 @@ STEPS = [
      SRC_DIR / "ingest" / "probability_he_ingest.py"),
     ("[14/16] Game probability / HE dashboard",
      SRC_DIR / "dashboard" / "generate_probability_dashboard_html.py"),
-    ("[15/16] Refresh round dealer time source data",
-     SRC_DIR / "ingest" / "round_dealer_time_ingest.py"),
-    ("[16/16] Round dealer time dashboard",
-     SRC_DIR / "dashboard" / "generate_round_dealer_time_dashboard_html.py"),
-    ("[17/17] Refresh round table time source data",
-     SRC_DIR / "ingest" / "round_table_time_ingest.py"),
-    ("[18/17] Round table time dashboard",
-     SRC_DIR / "dashboard" / "generate_round_table_time_dashboard_html.py"),
+    ("[15/16] Refresh unified dealer & table time source data",
+     SRC_DIR / "ingest" / "round_dealer_table_time_ingest.py"),
+    ("[16/16] Unified dealer & table time dashboard",
+     SRC_DIR / "dashboard" / "generate_round_dealer_table_time_dashboard_html.py"),
 ]
 
 
@@ -330,56 +326,29 @@ def should_skip_probability_dashboard():
     return all(dep.exists() and dep.stat().st_mtime <= out_mtime for dep in dependencies)
 
 
-def should_skip_round_dealer_dashboard():
-    output_dir = WORKSPACE / "output" / "dashboards"
-    out_file = output_dir / "round_dealer_time_dashboard.html"
-    if not out_file.exists() or out_file.stat().st_size == 0:
-        return False
-    dependencies = [
-        output_dir / "round_dealer_time_data.json",
-        SRC_DIR / "dashboard" / "generate_round_dealer_time_dashboard_html.py",
-    ]
-    out_mtime = out_file.stat().st_mtime
-    return all(dep.exists() and dep.stat().st_mtime <= out_mtime for dep in dependencies)
-
-
-def should_skip_round_dealer_ingest():
+def should_skip_round_dealer_table_ingest():
     output_dir = WORKSPACE / "output"
-    out_file = output_dir / "round_dealer_time_data.json"
+    out_file = output_dir / "round_dealer_table_time_data.json"
     if not out_file.exists() or out_file.stat().st_size == 0:
         return False
-    # Depend on the ingest script itself and the manifest
     deps = [
-        SRC_DIR / "ingest" / "round_dealer_time_ingest.py",
-        output_dir / "game_probability_he_data.json",  # depends on other pipelines completing first
+        SRC_DIR / "ingest" / "round_dealer_table_time_ingest.py",
     ]
     out_mtime = out_file.stat().st_mtime
     return all(dep.exists() and dep.stat().st_mtime <= out_mtime for dep in deps)
 
 
-def should_skip_round_table_dashboard():
+def should_skip_round_dealer_table_dashboard():
     output_dir = WORKSPACE / "output" / "dashboards"
-    out_file = output_dir / "round_table_time_dashboard.html"
+    out_file = output_dir / "round_dealer_table_time_dashboard.html"
     if not out_file.exists() or out_file.stat().st_size == 0:
         return False
     dependencies = [
-        output_dir / "round_table_time_data.json",
-        SRC_DIR / "dashboard" / "generate_round_table_time_dashboard_html.py",
+        output_dir / "round_dealer_table_time_data.json",
+        SRC_DIR / "dashboard" / "generate_round_dealer_table_time_dashboard_html.py",
     ]
     out_mtime = out_file.stat().st_mtime
     return all(dep.exists() and dep.stat().st_mtime <= out_mtime for dep in dependencies)
-
-
-def should_skip_round_table_ingest():
-    output_dir = WORKSPACE / "output"
-    out_file = output_dir / "round_table_time_data.json"
-    if not out_file.exists() or out_file.stat().st_size == 0:
-        return False
-    deps = [
-        SRC_DIR / "ingest" / "round_table_time_ingest.py",
-    ]
-    out_mtime = out_file.stat().st_mtime
-    return all(dep.exists() and dep.stat().st_mtime <= out_mtime for dep in deps)
 
 
 def run_step(label, script_path):
@@ -475,19 +444,11 @@ def main():
             print(f"\n    [SKIP] {script_path.name} - output already exists and inputs unchanged")
             progress.update(label)
             continue
-        if label.startswith("[15/16]") and should_skip_round_dealer_ingest():
+        if label.startswith("[15/16]") and should_skip_round_dealer_table_ingest():
             print(f"\n    [SKIP] {script_path.name} - output already exists and inputs unchanged")
             progress.update(label)
             continue
-        if label.startswith("[16/16]") and should_skip_round_dealer_dashboard():
-            print(f"\n    [SKIP] {script_path.name} - output already exists and inputs unchanged")
-            progress.update(label)
-            continue
-        if label.startswith("[17/17]") and should_skip_round_table_ingest():
-            print(f"\n    [SKIP] {script_path.name} - output already exists and inputs unchanged")
-            progress.update(label)
-            continue
-        if label.startswith("[18/17]") and should_skip_round_table_dashboard():
+        if label.startswith("[16/16]") and should_skip_round_dealer_table_dashboard():
             print(f"\n    [SKIP] {script_path.name} - output already exists and inputs unchanged")
             progress.update(label)
             continue
@@ -521,8 +482,8 @@ def main():
     print("  - output/reports/hourly_traffic.csv")
     print("  - output/reports/time_series_analysis.csv")
     print("  - output/reports/country_hourly_heatmap.csv")
-    print("  - output/dashboards/round_dealer_time_dashboard.html")
-    print("  - output/round_dealer_time_data.json")
+    print("  - output/dashboards/round_dealer_table_time_dashboard.html")
+    print("  - output/round_dealer_table_time_data.json")
     return 0
 
 

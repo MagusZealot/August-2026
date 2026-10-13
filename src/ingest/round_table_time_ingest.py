@@ -161,14 +161,14 @@ def parse_snapshot(path):
     """Parse a cached snapshot CSV into normalized row dicts.
     
     CSV format verified 2026-10-12:
-      BILLING_DATE, GAME_TYPE, TABLE, AVG_TIMEDIFF, STD_TIMEDIFF
+      BILLING_DATE, GAME_TYPE, TABLE_NO, AVG_TIMEDIFF, STD_TIMEDIFF
     """
     rows = []
     with open(path, "r", encoding="utf-8-sig", newline="") as f:
         for raw in csv.DictReader(f):
             bd = (raw.get("BILLING_DATE") or raw.get("billing_date") or "").strip()
             gt = (raw.get("GAME_TYPE") or raw.get("game_type") or "").strip()
-            tb = (raw.get("TABLE") or raw.get("table") or "").strip()
+            tb = (raw.get("TABLE_NO") or raw.get("table_no") or raw.get("TABLE") or raw.get("table") or "").strip()
             av = to_float(raw.get("AVG_TIMEDIFF") or raw.get("avg_time_diff") or "")
             sv = to_float(raw.get("STD_TIMEDIFF") or raw.get("std_time_diff") or "")
             if not bd or not gt or not tb:
@@ -177,8 +177,8 @@ def parse_snapshot(path):
                 "date": bd,
                 "game_type": gt,
                 "table": tb,
-                "actual_duration": av,   # AVG_TIMEDIFF = actual mean round duration
-                "expected_duration": sv, # STD_TIMEDIFF used as expected proxy
+                "actual_duration": av,        # AVG_TIMEDIFF = actual mean round duration
+                "std_actual_duration": sv,    # STD_TIMEDIFF = standard deviation of round durations
                 "updated_at": (raw.get("updated_at") or "").strip(),
             })
     return rows
@@ -197,7 +197,7 @@ def median(vals):
         return None
     n = len(vals)
     mid = n // 2
-    if n % 5:
+    if n % 2:
         return round(vals[mid], 4)
     return round((vals[mid - 1] + vals[mid]) / 2.0, 4)
 
@@ -213,62 +213,40 @@ def build_table_trajectories(records):
     """Build per-table trajectory across all dates and game types.
     
     Returns:
-      table_entries: dict table_id -> list of {date, game_type, actual, expected, delta}
+      table_entries: dict table_id -> list of {date, game_type, actual_duration, expected_duration, std_actual_duration, duration_delta, is_breach}
       game_table_map: dict game_type -> dict table_id -> [records...]
     """
-    # Group by (table, game_type) to get per-table-per-game history
-    table_game_keys = defaultdict(list)  # (table, game_type) -> [row, ...]
+    table_game_keys = defaultdict(list)
     for r in records:
         table_game_keys[(r["table"], r["game_type"])].append(r)
 
-    table_entries = defaultdict(list)  # table_id -> [entry, ...]
-    game_table_map = defaultdict(lambda: defaultdict(list))  # game_type -> table_id -> [records...]
+    table_entries = defaultdict(list)
+    game_table_map = defaultdict(lambda: defaultdict(list))
 
     for (table, game_type), sublist in table_game_keys.items():
-        # Sort by date to get time series
         sublist.sort(key=lambda r: r["date"])
-        game_table_map[game_type][table] = sublist
-
-        # Build trajectory entries for this table+game
-        for i, r in enumerate(sublist):
-            # Find previous record for delta calculation
-            prev = sublist[i - 1] if i > 0 else None
-            delta = None
-            if prev is not None and r["actual_duration"] is not None and prev["actual_duration"] is not None:
-                delta = round(r["actual_duration"] - prev["actual_duration"], 4)
-
+        for r in sublist:
             table_entries[table].append({
                 "date": r["date"],
                 "game_type": game_type,
-                "actual_duration": r["actual_duration"],
-                "expected_duration": r["expected_duration"],
-                "duration_delta": delta,
+                "actual_duration": rnd(r["actual_duration"]),
+                "expected_duration": rnd(r.get("expected_duration")),
+                "std_actual_duration": rnd(r["std_actual_duration"]),
+                "duration_delta": rnd(r.get("duration_delta")),
+                "is_breach": r.get("is_breach", False),
             })
 
-        # Also aggregate per-table (across all games) entries
-        for r in sublist:
-            table_entries[r["table"]].append({
-                "date": r["date"],
-                "game_type": game_type,
-                "actual_duration": r["actual_duration"],
-                "expected_duration": r["expected_duration"],
-                "duration_delta": None,  # will be computed below
-            })
-
-    # Compute cross-table deltas per table
     for table_id, entries in table_entries.items():
-        # Sort by date then game_type
         entries.sort(key=lambda e: (e["date"], e["game_type"]))
-        # Compute delta from previous entry (any game)
         for i in range(1, len(entries)):
             prev = entries[i - 1]
             cur = entries[i]
             if cur["actual_duration"] is not None and prev["actual_duration"] is not None:
-                cur["cross_table_delta"] = round(cur["actual_duration"] - prev["actual_duration"], 4)
+                cur["cross_game_delta"] = rnd(cur["actual_duration"] - prev["actual_duration"], 4)
             else:
-                cur["cross_table_delta"] = None
+                cur["cross_game_delta"] = None
 
-    return dict(table_entries), dict(game_table_map)
+    return dict(table_entries)
 
 
 def build_data_quality(rows, dates, game_types, meta):
@@ -289,12 +267,12 @@ def build_data_quality(rows, dates, game_types, meta):
                 "first_date": min(r["date"] for r in sub),
                 "last_date": max(r["date"] for r in sub),
                 "null_actual_duration": sum(1 for r in sub if r["actual_duration"] is None),
-                "null_expected_duration": sum(1 for r in sub if r["expected_duration"] is None),
+                "null_std_duration": sum(1 for r in sub if r["std_actual_duration"] is None),
             }
         duplicate_feeds.append({
             "normalized": up,
             "variants": detail,
-            "note": " Same table-game combos published under two spellings; both retained.",
+            "note": "Same table-game combos published under two spellings; both retained.",
         })
 
     coverage = []
@@ -315,7 +293,7 @@ def build_data_quality(rows, dates, game_types, meta):
     coverage.sort(key=lambda c: c["coverage_pct"])
 
     null_fields = {}
-    for field in ("actual_duration", "expected_duration"):
+    for field in ("actual_duration", "std_actual_duration"):
         n = sum(1 for r in rows if r[field] is None)
         null_fields[field] = {"rows": n, "pct": round(n / len(rows) * 100, 2) if rows else 0.0}
 
@@ -327,57 +305,97 @@ def build_data_quality(rows, dates, game_types, meta):
 
 
 def build_payload(records, meta_extra):
-    """Aggregate the deduplicated record set into the dashboard payload.
-    
-    Enhanced with per-table trajectories and table-level summaries.
-    """
+    """Aggregate the deduplicated record set into the dashboard payload."""
     by_key = {}
     for r in records:
         k = (r["date"], r["game_type"], r["table"])
         prev = by_key.get(k)
-        if prev is None or r["updated_at"] > prev["updated_at"]:
+        if prev is None or r.get("updated_at", "") > prev.get("updated_at", ""):
             by_key[k] = r
     rows = list(by_key.values())
+    rows.sort(key=lambda r: (r["date"], r["game_type"], r["table"]))
 
-    # Build per-table trajectories
-    table_entries, game_table_map = build_table_trajectories(records)
+    dates = sorted({r["date"] for r in rows})
+    game_types = sorted({r["game_type"] for r in rows})
+    tables = sorted({r["table"] for r in rows})
 
+    # Compute benchmarks per game type
+    game_benchmarks = {}
+    for gt in game_types:
+        sub_act = [r["actual_duration"] for r in rows if r["game_type"] == gt and r["actual_duration"] is not None]
+        sub_std = [r["std_actual_duration"] for r in rows if r["game_type"] == gt and r["std_actual_duration"] is not None]
+        m_act = mean(sub_act) or 0.0
+        m_std = mean(sub_std) or 0.0
+        thresh = round(m_act + m_std, 4)
+        game_benchmarks[gt] = {
+            "expected_duration": m_act,
+            "expected_std": m_std,
+            "threshold": thresh,
+        }
+
+    # Tag rows with expected duration, threshold, delta, and breach
     for r in rows:
+        bm = game_benchmarks.get(r["game_type"], {"expected_duration": 0.0, "threshold": 9999.0})
+        r["expected_duration"] = bm["expected_duration"]
+        r["threshold"] = bm["threshold"]
         r["duration_delta"] = (
-            round(r["actual_duration"] - r["expected_duration"], 4)
-            if r["actual_duration"] is not None and r["expected_duration"] is not None
+            round(r["actual_duration"] - bm["expected_duration"], 4)
+            if r["actual_duration"] is not None
             else None
         )
+        r["is_breach"] = (
+            r["actual_duration"] > bm["threshold"]
+            if r["actual_duration"] is not None
+            else False
+        )
 
-    rows.sort(key=lambda r: (r["date"], r["game_type"], r["table"]))
-    dates = sorted({r["date"] for r in records})
-    game_types = sorted({r["game_type"] for r in records})
-    tables = sorted({r["table"] for r in records})
+    # Build per-table trajectories using deduplicated rows
+    table_entries = build_table_trajectories(rows)
+
     meta_extra["unique_keys"] = len(rows)
 
     # Per-game summaries
     gt_summary = []
     for gt in game_types:
-        sub = [r for r in records if r["game_type"] == gt]
+        sub = [r for r in rows if r["game_type"] == gt]
         sub_dates = sorted({r["date"] for r in sub})
         adur = [r["actual_duration"] for r in sub if r["actual_duration"] is not None]
-        edur = [r["expected_duration"] for r in sub if r["expected_duration"] is not None]
-        breaches = sum(
-            1 for r in sub
-            if r["actual_duration"] is not None
-            and r["expected_duration"] is not None
-            and r["actual_duration"] > r["expected_duration"]
-        )
+        sdur = [r["std_actual_duration"] for r in sub if r["std_actual_duration"] is not None]
+        deltas = [r["duration_delta"] for r in sub if r["duration_delta"] is not None]
+        breaches = sum(1 for r in sub if r["is_breach"])
+        bm = game_benchmarks[gt]
+
+        table_stats = []
+        for tid in {r["table"] for r in sub}:
+            t_sub = [r for r in sub if r["table"] == tid]
+            t_adur = [r["actual_duration"] for r in t_sub if r["actual_duration"] is not None]
+            t_sdur = [r["std_actual_duration"] for r in t_sub if r["std_actual_duration"] is not None]
+            t_breaches = sum(1 for r in t_sub if r["is_breach"])
+            table_stats.append({
+                "table_id": tid,
+                "mean_actual": rnd(mean(t_adur)),
+                "mean_expected": bm["expected_duration"],
+                "mean_std": rnd(mean(t_sdur)),
+                "breach_pct": rnd(t_breaches / len(t_sub) * 100, 2) if t_sub else 0.0,
+                "rows": len(t_sub),
+            })
+        table_stats.sort(key=lambda t: (t["mean_actual"] or 0), reverse=True)
+
         gt_summary.append({
             "game_type": gt,
             "rows": len(sub),
             "days": len(sub_dates),
+            "first_date": sub_dates[0] if sub_dates else None,
+            "last_date": sub_dates[-1] if sub_dates else None,
             "tables": len({r["table"] for r in sub}),
             "mean_actual_duration": mean(adur),
-            "mean_expected_duration": mean(edur),
-            "mean_duration_delta": mean([r["duration_delta"] for r in sub if r["duration_delta"] is not None]),
+            "mean_expected_duration": bm["expected_duration"],
+            "mean_std_duration": mean(sdur),
+            "mean_duration_delta": mean(deltas),
+            "threshold": bm["threshold"],
             "breaches": breaches,
             "breach_pct": round(breaches / len(sub) * 100, 2) if sub else 0.0,
+            "top_tables": table_stats[:10],
         })
     gt_summary.sort(key=lambda g: (-g["rows"], g["game_type"]))
 
@@ -389,11 +407,12 @@ def build_payload(records, meta_extra):
             continue
         all_adur = [e["actual_duration"] for e in t_entries if e["actual_duration"] is not None]
         all_edur = [e["expected_duration"] for e in t_entries if e["expected_duration"] is not None]
-        total_breaches = sum(
-            1 for e in t_entries
-            if e["actual_duration"] is not None
-            and e["expected_duration"] is not None
-            and e["actual_duration"] > e["expected_duration"]
+        all_sdur = [e["std_actual_duration"] for e in t_entries if e["std_actual_duration"] is not None]
+        total_breaches = sum(1 for e in t_entries if e["is_breach"])
+        trend = (
+            round(t_entries[-1]["actual_duration"] - t_entries[0]["actual_duration"], 4)
+            if len(t_entries) > 1 and t_entries[0]["actual_duration"] is not None and t_entries[-1]["actual_duration"] is not None
+            else None
         )
         table_summaries.append({
             "table_id": table_id,
@@ -402,33 +421,37 @@ def build_payload(records, meta_extra):
             "games_count": len({e["game_type"] for e in t_entries}),
             "mean_actual_duration": mean(all_adur),
             "mean_expected_duration": mean(all_edur),
+            "mean_std_duration": mean(all_sdur),
             "total_breaches": total_breaches,
             "breach_pct": round(total_breaches / len(t_entries) * 100, 2) if t_entries else 0.0,
-            "recent_trend": t_entries[-1]["actual_duration"] - t_entries[0]["actual_duration"] if len(t_entries) > 1 and t_entries[0]["actual_duration"] is not None and t_entries[-1]["actual_duration"] is not None else None,
+            "recent_trend": trend,
         })
-    table_summaries.sort(key=lambda t: t["mean_actual_duration"], reverse=True)
+    table_summaries.sort(key=lambda t: (t["mean_actual_duration"] or 0), reverse=True)
 
     # Series data per game type
     series_duration = {gt: [] for gt in game_types}
+    series_expected_duration = {gt: [] for gt in game_types}
     series_breach = {gt: [] for gt in game_types}
     daily = []
 
     for d in dates:
-        day_rows = [r for r in records if r["date"] == d]
+        day_rows = [r for r in rows if r["date"] == d]
+        day_actuals = [r["actual_duration"] for r in day_rows if r["actual_duration"] is not None]
+        day_expecteds = [r["expected_duration"] for r in day_rows if r["expected_duration"] is not None]
+        day_stds = [r["std_actual_duration"] for r in day_rows if r["std_actual_duration"] is not None]
+        day_deltas = [r["duration_delta"] for r in day_rows if r["duration_delta"] is not None]
+        day_breaches = sum(1 for r in day_rows if r["is_breach"])
+
         entry = {
             "date": d,
             "samples": len(day_rows),
-            "breaches": sum(
-                1 for r in day_rows
-                if r["actual_duration"] is not None
-                and r["expected_duration"] is not None
-                and r["actual_duration"] > r["expected_duration"]
-            ),
-            "mean_actual_duration": mean([r["actual_duration"] for r in day_rows]),
-            "mean_expected_duration": mean([r["expected_duration"] for r in day_rows]),
-            "mean_duration_delta": mean([r["duration_delta"] for r in day_rows if r["duration_delta"] is not None]),
+            "breaches": day_breaches,
+            "mean_actual_duration": mean(day_actuals),
+            "mean_expected_duration": mean(day_expecteds),
+            "mean_std_duration": mean(day_stds),
+            "mean_duration_delta": mean(day_deltas),
+            "breach_pct": round(day_breaches / len(day_rows) * 100, 2) if day_rows else 0.0,
         }
-        entry["breach_pct"] = round(entry["breaches"] / len(day_rows) * 100, 2) if day_rows else 0.0
         daily.append(entry)
 
         for gt in game_types:
@@ -436,26 +459,23 @@ def build_payload(records, meta_extra):
             if not gt_day:
                 continue
             series_duration[gt].append([d, mean([r["actual_duration"] for r in gt_day])])
-            series_breach[gt].append([d, round(sum(1 for r in gt_day if r["actual_duration"] > r["expected_duration"]) / len(gt_day) * 100, 2) if gt_day else 0.0])
+            series_expected_duration[gt].append([d, mean([r["expected_duration"] for r in gt_day])])
+            series_breach[gt].append([d, round(sum(1 for r in gt_day if r["is_breach"]) / len(gt_day) * 100, 2) if gt_day else 0.0])
 
     latest_date = dates[-1] if dates else None
     latest_rows = []
     if latest_date:
-        for r in sorted([r for r in records if r["date"] == latest_date], key=lambda r: (r["game_type"], r["table"])):
+        for r in sorted([r for r in rows if r["date"] == latest_date], key=lambda r: (r["game_type"], r["table"])):
             latest_rows.append({
                 "game_type": r["game_type"],
                 "table": r["table"],
                 "actual_duration": rnd(r["actual_duration"]),
                 "expected_duration": rnd(r["expected_duration"]),
+                "std_actual_duration": rnd(r["std_actual_duration"]),
                 "duration_delta": rnd(r["duration_delta"]),
+                "threshold": rnd(r["threshold"]),
+                "is_breach": r["is_breach"],
             })
-
-    # Breach tables - tables with highest breach rates
-    breach_tables = sorted(
-        [t for t in table_summaries if t["breach_pct"] > 0],
-        key=lambda t: t["breach_pct"],
-        reverse=True,
-    )[:20]
 
     data_quality = build_data_quality(rows, dates, game_types, meta_extra)
 
@@ -464,11 +484,11 @@ def build_payload(records, meta_extra):
         "game_types": gt_summary,
         "tables": table_summaries,
         "series_duration": series_duration,
+        "series_expected_duration": series_expected_duration,
         "series_breach": series_breach,
         "daily": daily,
         "latest_day": {"billing_date": latest_date, "rows": latest_rows},
-        "table_entries": table_entries,  # per-table trajectory data
-        "game_table_map": game_table_map,  # game_type -> table -> records
+        "table_entries": table_entries,
         "data_quality": data_quality,
         "missing_dates": meta_extra.get("files_missing", []),
     }
@@ -568,13 +588,14 @@ def main():
         "rows_raw": len(records),
         "game_types": sorted({r["game_type"] for r in records}),
         "tables_tracked": len({r["table"] for r in records}),
-        "null_duration_rows": sum(1 for r in records if r["actual_duration"] is None or r["expected_duration"] is None),
+        "null_duration_rows": sum(1 for r in records if r["actual_duration"] is None or r["std_actual_duration"] is None),
         "table_entries_count": len({r["table"] for r in records}),
         "he_significant_delta": 5.0,
-        "prob_breach_rule": "actual_duration > expected_duration",
+        "prob_breach_rule": "actual_duration > threshold (mean + 1 std)",
     }
 
     payload = build_payload(records, meta)
+    meta["rows_raw"] = payload["meta"]["unique_keys"]
 
     with open(OUT_FILE, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
