@@ -16,8 +16,21 @@ history.
 import json
 from pathlib import Path
 
-REPORT_DIR = Path(r"C:\Users\IT-40126\Documents\August 2026-20261008T011759Z-1-001\August 2026\output\dashboards")
-DATA_DIR = Path(r"C:\Users\IT-40126\Documents\August 2026-20261008T011759Z-1-001\August 2026\output")
+# Discover workspace root relative to this script
+SCRIPT_DIR = Path(__file__).resolve().parent
+# src/dashboard -> go up 2 levels to reach workspace root
+WORKSPACE = SCRIPT_DIR.parent.parent
+
+# Fallback: look for workspace_map.txt to confirm
+if not (WORKSPACE / "workspace_map.txt").exists():
+    # Try to find by walking up further
+    for parent in WORKSPACE.parents:
+        if (parent / "workspace_map.txt").exists():
+            WORKSPACE = parent
+            break
+
+REPORT_DIR = WORKSPACE / "output" / "dashboards"
+DATA_DIR = WORKSPACE / "output"
 FOLDER = REPORT_DIR.parent
 INDEX_FILE = DATA_DIR / "all_players_index.json"
 DOSSIER_FILE = DATA_DIR / "individual_dossiers_data.json"

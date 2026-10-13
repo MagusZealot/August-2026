@@ -28,7 +28,7 @@ import sys
 import time
 from pathlib import Path
 
-WORKSPACE = Path(r"C:\Users\IT-40126\Documents\August 2026-20261008T011759Z-1-001\August 2026")
+WORKSPACE = Path(__file__).resolve().parent.parent
 SRC_DIR = WORKSPACE / "src"
 
 STEPS = [
