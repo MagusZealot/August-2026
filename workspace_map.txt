@@ -803,4 +803,114 @@ point at bi_dashboard.html / player_behavior_dashboard.html). Both were
 regenerated/synced.
 
 ==============================================================================
+   10. RECENT UPDATE (2026-10-13) — PROBABILITY CONSOLE SHOWS ALL GAMES AT ONCE
+==============================================================================
+
+output\dashboards\game_probability_dashboard.html (generator:
+src\dashboard\generate_probability_dashboard_html.py, pipeline step 14) no
+longer relies on the "Trend game" dropdown — every game type is displayed
+simultaneously, with a new combined aggregate section on top.
+
+1. REMOVED: <select id="gameFilter"> and its label from the .filters row. The
+   hero h2 now reads "Every game at a glance: combined trends and per-game
+   detail". The .filters row keeps Trend window (#periodFilter), Start date,
+   End date and the Reset range button.
+
+2. ADDED: "Combined Summary — all games" section at the top of the main grid:
+   a wide header card (#combinedNote shows pooled row/bet-place counts, pooled
+   breach rate and the active range) plus two ECharts instances —
+   #combinedHe (overall HE trend: pooled daily mean actual vs expected HE) and
+   #combinedProb (overall probability and threshold trend) — both built from
+   DATA.daily (per-day cross-game means). renderCombinedSummary() drives them.
+
+3. REPLACED: the tabbed trend panel (id="trendPanel", .trend-tabs /
+   .trend-pane, switchTrendTab) is gone. Its two per-selected-game charts are
+   superseded by the per-game charts below; the unused trend-tab CSS was
+   removed.
+
+4. ADDED: buildGameSections() — a JS loop over DATA.game_types that injects one
+   <article class="card chart-card wide" id-free> per game into
+   <div class="game-sections" id="gameSections"> (CSS display:contents so the
+   articles participate directly in the 2-column .grid). Each section contains:
+   - A dedicated <table> inside <div class="table-wrap">: a bold
+     .table-total row ("<GAME> — all bet places") with timeframe-filtered
+     game-level means followed by one row per bet place from
+     DATA.bet_places (full-history pooled means; the caption notes this).
+   - Two .chart-card charts inside a nested .grid: "HE trend — <GAME>"
+     (#gameHe-<i>) and "Probability and threshold trend — <GAME>"
+     (#gameProb-<i>), series style matching the old trend charts (time axis,
+     inside+slider dataZoom, smooth lines, dashed expected, dotted threshold).
+   ECharts instances are registered in the gameCharts array.
+
+5. GLOBAL TIMEFRAME: inTimeframe(day) = date range ∩ trend window
+   (#periodFilter, default 90 days). It now applies simultaneously to the
+   Combined Summary charts, every per-game table (game row) and every per-game
+   chart; changing #periodFilter, #startDate or #endDate re-renders all of
+   them via render(). timeframeSeries()/timeframeMean() recompute the
+   game-level metrics from the per-game series over the visible days. The two
+   cross-game comparison charts (heCompare/probCompare) keep their existing
+   date-range behaviour with precomputed mean_* fallback, and the "Game type
+   summary" table keeps the precomputed full-history means.
+
+6. VERIFICATION: node --check on the inline script; stubbed DOM/ECharts smoke
+   test — 39/39 checks pass (21 chart instances: 5 static + 16 per-game; 8
+   per-game tables with 1 + bet-place rows each; window switch widens series
+   and updates table days; date range filters the combined charts and updates
+   the captions; reset restores full history; relationship scatter groups match
+   the valid latest-day rows).
+
+==============================================================================
+   11. RECENT UPDATE (2026-10-13) — QUICK NAV + THRESHOLD BREACH ANALYTICS
+==============================================================================
+
+Follow-up to section 10 on output\dashboards\game_probability_dashboard.html
+(plus a supporting payload change from
+src\ingest\probability_he_ingest.py, pipeline step 13).
+
+1. STICKY QUICK NAVIGATION (inside the existing sticky <header>):
+   <nav class="quick-nav" id="quickNav"> wraps to its own row (flex-basis:100%)
+   with a top separator, so it stays pinned while scrolling. buildQuickNav()
+   fills it from a "Jump to" label + links: #combinedPanel (Combined Summary),
+   #breachAnalytics (Threshold Breach Analytics), one link per game, and
+   #gameSummary (Game type summary). Each per-game article now carries a unique
+   anchor id (id="game-BACCARAT", …) assigned by uniqueGameAnchor() —
+   slugify() uppercases and hyphenates the name and a numeric suffix resolves
+   the CLASSIC DT / Classic DT casing alias collision. html has
+   scroll-behavior:smooth and article[id]{scroll-margin-top:140px} so jumps
+   clear the sticky header.
+
+2. THRESHOLD BREACH ANALYTICS: new <article class="card chart-card wide"
+   id="breachAnalytics"> directly below the Combined Summary block, holding a
+   nested .grid with:
+   - #breachCalendar — ECharts calendar coordinate system + heatmap series of
+     daily breach counts (DATA.daily[].breaches) over the visible range, with a
+     horizontal visualMap scaled to the worst day in view.
+   - #breachByDate — stacked bar chart, one stacked series per game type over
+     billing-date categories, from the new series_breach_count payload field.
+   - Two .table-wrap tables: "Number of times threshold exceeded by game type"
+     (#breachByGameRows: breaches in view, share, days in view, breaches/day,
+     full-history breaches and breach %) and "… by betting area"
+     (#breachByBetPlaceRows: all 111 bet places with in-view and full-history
+     breaches from the new bet_place_breaches payload field).
+
+3. PAYLOAD SUPPORT (probability_he_ingest.py): the per-(date, game) breach
+   COUNTS were computed internally but only the percentage was published.
+   Added series_breach_count {game: [[date, count], …]} (dense) and
+   bet_place_breaches {"GAME|bet_place": [[date, count], …]} (sparse, breach
+   days only). Payload grew 821 KB -> ~1.07 MB. Verified: per-game daily counts
+   sum exactly to game_types[].breaches and each bet-place series sums to
+   bet_places[].breaches (61 of 111 bet places ever breach).
+
+4. GLOBAL TIMEFRAME: renderBreachAnalytics() is part of render(), so the
+   calendar, stacked bar and both tables recalculate whenever #periodFilter,
+   #startDate or #endDate changes (inTimeframe = date range ∩ trend window);
+   #breachNote reports totals, days in view and the peak day.
+
+5. VERIFICATION: node --check; stubbed DOM/ECharts smoke test — 38/38 checks
+   pass (23 chart instances: 7 static + 16 per-game; 11 quick-nav links all
+   resolving to existing anchors; unique game ids incl. the DT alias pair;
+   calendar/stacked-bar series and table totals reconcile with the payload for
+   the 90-day window, "all" history, an August start date and reset).
+
+==============================================================================
 EOF

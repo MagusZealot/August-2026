@@ -36,7 +36,7 @@ import os
 import sys
 import urllib.error
 import urllib.request
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -412,6 +412,8 @@ def build_payload(records, meta_extra):
     series_threshold = {gt: [] for gt in game_types}
     series_prob_gap = {gt: [] for gt in game_types}
     series_breach = {gt: [] for gt in game_types}
+    series_breach_count = {gt: [] for gt in game_types}
+    bet_place_breach_events = defaultdict(list)
     daily = []
 
     for d in dates:
@@ -442,6 +444,16 @@ def build_payload(records, meta_extra):
             series_threshold[gt].append([d, mean([r["threshold"] for r in gt_day])])
             series_prob_gap[gt].append([d, mean([r["prob_delta"] for r in gt_day if r["prob_delta"] is not None])])
             series_breach[gt].append([d, round(breaching(gt_day) / len(gt_day) * 100, 2)])
+            series_breach_count[gt].append([d, breaching(gt_day)])
+
+        for r in day_rows:
+            if r["prob_breach"]:
+                bet_place_breach_events[(r["game_type"], r["bet_place"])].append(d)
+
+    bet_place_breaches = {
+        f"{gt}|{bp}": [[day, count] for day, count in sorted(Counter(days_hit).items())]
+        for (gt, bp), days_hit in sorted(bet_place_breach_events.items())
+    }
 
     latest_date = dates[-1] if dates else None
     latest_rows = []
@@ -525,6 +537,8 @@ def build_payload(records, meta_extra):
         "series_threshold": series_threshold,
         "series_prob_gap": series_prob_gap,
         "series_breach": series_breach,
+        "series_breach_count": series_breach_count,
+        "bet_place_breaches": bet_place_breaches,
         "daily": daily,
         "latest_day": {"billing_date": latest_date, "rows": latest_rows},
         "watchlist": {

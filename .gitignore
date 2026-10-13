@@ -1,6 +1,7 @@
 # Data files - DO NOT COMMIT (large files, generated artifacts)
 data/raw/
 data/probability/
+data/round_dealer_time/
 legacy output/
 output/
 

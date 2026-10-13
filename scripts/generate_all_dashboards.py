@@ -4,20 +4,22 @@ Generate all Oriental Gaming Title dashboards and their source data files.
 
 Runs the complete data pipeline in dependency order:
 
-  1. whale_tracking.py          -> whale_analysis.csv
-  2. time_series_analysis.py    -> time_series_analysis.csv + hourly_traffic.csv
-  3. chaser_detection.py        -> chaser_detection.csv
-  4. operator_analysis.py       -> operator_performance.csv
-  5. generate_heatmap_matrix.py -> country_hourly_heatmap.csv
-  6. build_all_players_dossiers.py -> all_players_index_XX.json + dossier_chunks_XX/
-  7. generate_player_behavior_data.py -> player_behavior_data.json
-  8. build_individual_dossiers.py  -> individual_dossiers_data.json (42 players + 35 operators)
-  9. prepare_dashboard_data.py     -> dashboard_data.json (master BI payload)
-  10. generate_dashboard_html.py    -> bi_dashboard.html (Main BI Console)
-  11. generate_behavior_dashboard_html.py -> player_behavior_dashboard.html
-  12. inject_dossier_tabs.py        -> injects dossier system into behavior console
-  13. probability_he_ingest.py      -> game_probability_he_data.json
-  14. generate_probability_dashboard_html.py -> game_probability_dashboard.html
+  1. whale_tracking.py                   -> output/reports/whale_analysis.csv
+  2. time_series_analysis.py             -> output/reports/time_series_analysis.csv + hourly_traffic.csv
+  3. chaser_detection.py                 -> output/reports/chaser_detection.csv
+  4. operator_analysis.py                -> output/reports/operator_performance.csv
+  5. generate_heatmap_matrix.py          -> output/reports/country_hourly_heatmap.csv
+  6. build_all_players_dossiers.py       -> output/data/all_players_index_XX.json + output/chunks/dossier_chunks_XX/
+  7. generate_player_behavior_data.py    -> output/data/player_behavior_data.json
+  8. build_individual_dossiers.py        -> output/data/individual_dossiers_data.json (42 players + 35 operators)
+  9. prepare_dashboard_data.py           -> output/data/dashboard_data.json (master BI payload)
+  10. generate_dashboard_html.py         -> output/dashboards/bi_dashboard.html (Main BI Console)
+  11. generate_behavior_dashboard_html.py -> output/dashboards/player_behavior_dashboard.html
+  12. inject_dossier_tabs.py             -> injects dossier system into behavior console
+  13. probability_he_ingest.py           -> output/game_probability_he_data.json (always refreshes)
+  14. generate_probability_dashboard_html.py -> output/dashboards/game_probability_dashboard.html
+  15. round_dealer_time_ingest.py        -> output/round_dealer_time_data.json
+  16. generate_round_dealer_time_dashboard_html.py -> output/dashboards/round_dealer_time_dashboard.html
 
 All scripts use hardcoded absolute paths under the workspace root, so they are
 invoked as standalone processes from the workspace working directory.
@@ -32,34 +34,38 @@ WORKSPACE = Path(__file__).resolve().parent.parent
 SRC_DIR = WORKSPACE / "src"
 
 STEPS = [
-    ("[1/14] Whale tracking analysis",
+    ("[1/16] Whale tracking analysis",
      SRC_DIR / "ingest" / "whale_tracking.py"),
-    ("[2/14] Time-series and hourly traffic analysis",
+    ("[2/16] Time-series and hourly traffic analysis",
      SRC_DIR / "ingest" / "time_series_analysis.py"),
-    ("[3/14] Chaser detection analysis",
+    ("[3/16] Chaser detection analysis",
      SRC_DIR / "ingest" / "chaser_detection.py"),
-    ("[4/14] Operator performance analysis",
+    ("[4/16] Operator performance analysis",
      SRC_DIR / "ingest" / "operator_analysis.py"),
-    ("[5/14] Country x 24h heatmap matrix",
+    ("[5/16] Country x 24h heatmap matrix",
      SRC_DIR / "ingest" / "generate_heatmap_matrix.py"),
-    ("[6/14] All-players dossier system (index + trajectory chunks)",
+    ("[6/16] All-players dossier system (index + trajectory chunks)",
      SRC_DIR / "ingest" / "build_all_players_dossiers.py"),
-    ("[7/14] Player behavior telemetry data",
+    ("[7/16] Player behavior telemetry data",
      SRC_DIR / "ingest" / "generate_player_behavior_data.py"),
-    ("[8/14] Individual player & operator dossiers",
+    ("[8/16] Individual player & operator dossiers",
      SRC_DIR / "ingest" / "build_individual_dossiers.py"),
-    ("[9/14] Master BI dashboard payload",
+    ("[9/16] Master BI dashboard payload",
      SRC_DIR / "dashboard" / "prepare_dashboard_data.py"),
-    ("[10/14] Main BI & Risk Intelligence Console HTML",
+    ("[10/16] Main BI & Risk Intelligence Console HTML",
      SRC_DIR / "dashboard" / "generate_dashboard_html.py"),
-    ("[11/14] Player Behavioral Intelligence Console HTML",
+    ("[11/16] Player Behavioral Intelligence Console HTML",
      SRC_DIR / "dashboard" / "generate_behavior_dashboard_html.py"),
-    ("[12/14] Inject dossier tabs into behavior console",
+    ("[12/16] Inject dossier tabs into behavior console",
      SRC_DIR / "dashboard" / "inject_dossier_tabs.py"),
-    ("[13/14] Refresh game probability / HE source data",
+    ("[13/16] Refresh game probability / HE source data",
      SRC_DIR / "ingest" / "probability_he_ingest.py"),
-    ("[14/14] Game probability / HE dashboard",
+    ("[14/16] Game probability / HE dashboard",
      SRC_DIR / "dashboard" / "generate_probability_dashboard_html.py"),
+    ("[15/16] Refresh round dealer time source data",
+     SRC_DIR / "ingest" / "round_dealer_time_ingest.py"),
+    ("[16/16] Round dealer time dashboard",
+     SRC_DIR / "dashboard" / "generate_round_dealer_time_dashboard_html.py"),
 ]
 
 
@@ -99,13 +105,13 @@ class ProgressBar:
 
 
 def should_skip_whale_analysis():
-    output_dir = WORKSPACE / "output"
+    output_dir = WORKSPACE / "output" / "reports"
     fpath = output_dir / "whale_analysis.csv"
     return fpath.exists() and fpath.stat().st_size > 0
 
 
 def should_skip_time_series():
-    output_dir = WORKSPACE / "output"
+    output_dir = WORKSPACE / "output" / "reports"
     required = ["time_series_analysis.csv", "hourly_traffic.csv"]
     for fname in required:
         fpath = output_dir / fname
@@ -115,19 +121,19 @@ def should_skip_time_series():
 
 
 def should_skip_chaser():
-    output_dir = WORKSPACE / "output"
+    output_dir = WORKSPACE / "output" / "reports"
     fpath = output_dir / "chaser_detection.csv"
     return fpath.exists() and fpath.stat().st_size > 0
 
 
 def should_skip_operator():
-    output_dir = WORKSPACE / "output"
+    output_dir = WORKSPACE / "output" / "reports"
     fpath = output_dir / "operator_performance.csv"
     return fpath.exists() and fpath.stat().st_size > 0
 
 
 def should_skip_heatmap():
-    output_dir = WORKSPACE / "output"
+    output_dir = WORKSPACE / "output" / "reports"
     out_file = output_dir / "country_hourly_heatmap.csv"
     if not out_file.exists() or out_file.stat().st_size == 0:
         return False
@@ -151,8 +157,8 @@ def should_skip_all_players_dossiers():
     if not export_files:
         return False
     for f_idx, fpath in enumerate(export_files):
-        idx_path = output_dir / f"all_players_index_{f_idx:02d}.json"
-        chunk_dir = output_dir / f"dossier_chunks_{f_idx:02d}"
+        idx_path = output_dir / "data" / f"all_players_index_{f_idx:02d}.json"
+        chunk_dir = output_dir / "chunks" / f"dossier_chunks_{f_idx:02d}"
         if not idx_path.exists() or idx_path.stat().st_size == 0:
             return False
         # Check that all expected chunks exist
@@ -177,7 +183,7 @@ def should_skip_all_players_dossiers():
 
 
 def should_skip_player_behavior():
-    output_dir = WORKSPACE / "output"
+    output_dir = WORKSPACE / "output" / "data"
     out_file = output_dir / "player_behavior_data.json"
     if not out_file.exists() or out_file.stat().st_size == 0:
         return False
@@ -194,14 +200,14 @@ def should_skip_player_behavior():
 
 def should_skip_individual_dossiers():
     output_dir = WORKSPACE / "output"
-    out_file = output_dir / "individual_dossiers_data.json"
+    out_file = output_dir / "data" / "individual_dossiers_data.json"
     if not out_file.exists() or out_file.stat().st_size == 0:
         return False
     # Depends on whale, chaser, operator CSVs and first 5 export files
     deps = [
-        output_dir / "whale_analysis.csv",
-        output_dir / "chaser_detection.csv",
-        output_dir / "operator_performance.csv",
+        output_dir / "reports" / "whale_analysis.csv",
+        output_dir / "reports" / "chaser_detection.csv",
+        output_dir / "reports" / "operator_performance.csv",
     ]
     data_dir = WORKSPACE / "data" / "raw"
     export_files = sorted(data_dir.glob("*EXPORT_CSV*.csv"))[:5]
@@ -217,17 +223,17 @@ def should_skip_individual_dossiers():
 
 def should_skip_prepare_dashboard():
     output_dir = WORKSPACE / "output"
-    out_file = output_dir / "dashboard_data.json"
+    out_file = output_dir / "data" / "dashboard_data.json"
     if not out_file.exists() or out_file.stat().st_size == 0:
         return False
     # Depends on all derived CSVs
     deps = [
-        output_dir / "whale_analysis.csv",
-        output_dir / "time_series_analysis.csv",
-        output_dir / "hourly_traffic.csv",
-        output_dir / "chaser_detection.csv",
-        output_dir / "operator_performance.csv",
-        output_dir / "country_hourly_heatmap.csv",
+        output_dir / "reports" / "whale_analysis.csv",
+        output_dir / "reports" / "time_series_analysis.csv",
+        output_dir / "reports" / "hourly_traffic.csv",
+        output_dir / "reports" / "chaser_detection.csv",
+        output_dir / "reports" / "operator_performance.csv",
+        output_dir / "reports" / "country_hourly_heatmap.csv",
     ]
     out_mtime = out_file.stat().st_mtime
     for dep in deps:
@@ -239,22 +245,28 @@ def should_skip_prepare_dashboard():
 
 
 def should_skip_main_dashboard():
-    output_dir = WORKSPACE / "output" / "dashboards"
-    out_file = output_dir / "bi_dashboard.html"
+    output_dir = WORKSPACE / "output"
+    dashboards_dir = output_dir / "dashboards"
+    out_file = dashboards_dir / "bi_dashboard.html"
     if not out_file.exists() or out_file.stat().st_size == 0:
         return False
     # Depends on dashboard_data.json, all per-export indexes and chunks, individual_dossiers_data.json
     deps = [
-        output_dir / "dashboard_data.json",
-        output_dir / "individual_dossiers_data.json",
+        output_dir / "data" / "dashboard_data.json",
+        output_dir / "data" / "individual_dossiers_data.json",
         WORKSPACE / "src" / "dashboard" / "generate_dashboard_html.py",
         *sorted((WORKSPACE / "src" / "dashboard" / "sections").glob("*.html")),
         WORKSPACE / "src" / "dashboard" / "sections" / "dossier.js",
     ]
-    # Also check per-export indexes exist (at least one)
+    # Also check per-export indexes and their chunks exist and are up-to-date
     export_files = sorted((WORKSPACE / "data" / "raw").glob("*EXPORT_CSV*.csv"))
     for f_idx, _ in enumerate(export_files):
-        deps.append(output_dir / f"all_players_index_{f_idx:02d}.json")
+        deps.append(output_dir / "data" / f"all_players_index_{f_idx:02d}.json")
+        # Check chunk directory mtimes too
+        chunk_dir = output_dir / "chunks" / f"dossier_chunks_{f_idx:02d}"
+        if chunk_dir.exists():
+            for chunk_file in chunk_dir.glob("chunk_*.js"):
+                deps.append(chunk_file)
     out_mtime = out_file.stat().st_mtime
     for dep in deps:
         if not dep.exists() or dep.stat().st_size == 0:
@@ -265,12 +277,13 @@ def should_skip_main_dashboard():
 
 
 def should_skip_behavior_dashboard():
-    output_dir = WORKSPACE / "output" / "dashboards"
-    out_file = output_dir / "player_behavior_dashboard.html"
+    output_dir = WORKSPACE / "output"
+    dashboards_dir = output_dir / "dashboards"
+    out_file = dashboards_dir / "player_behavior_dashboard.html"
     if not out_file.exists() or out_file.stat().st_size == 0:
         return False
     # Depends on player_behavior_data.json
-    dep = output_dir / "player_behavior_data.json"
+    dep = output_dir / "data" / "player_behavior_data.json"
     if not dep.exists() or dep.stat().st_size == 0:
         return False
     out_mtime = out_file.stat().st_mtime
@@ -281,16 +294,16 @@ def should_skip_behavior_dashboard():
 
 def should_skip_inject_dossier_tabs():
     output_dir = WORKSPACE / "output"
-    dashboards_dir = WORKSPACE / "output" / "dashboards"
+    dashboards_dir = output_dir / "dashboards"
     out_file = dashboards_dir / "player_behavior_dashboard.html"
     if not out_file.exists() or out_file.stat().st_size == 0:
         return False
-    # Depends on all_players_index.json (merged/legacy) and individual_dossiers_data.json
-    # Check for any all_players_index file
-    index_files = list(output_dir.glob("all_players_index*.json"))
-    if not index_files:
+    # Depends on all 27 per-export indexes in output/data/ and individual_dossiers_data.json
+    index_files = sorted((output_dir / "data").glob("all_players_index_*.json"))
+    if len(index_files) < 27:
         return False
-    deps = [index_files[0], output_dir / "individual_dossiers_data.json"]
+    deps = list(index_files)
+    deps.append(output_dir / "data" / "individual_dossiers_data.json")
     out_mtime = out_file.stat().st_mtime
     for dep in deps:
         if not dep.exists() or dep.stat().st_size == 0:
@@ -301,16 +314,42 @@ def should_skip_inject_dossier_tabs():
 
 
 def should_skip_probability_dashboard():
-    output_dir = WORKSPACE / "output" / "dashboards"
-    out_file = output_dir / "game_probability_dashboard.html"
+    dashboards_dir = WORKSPACE / "output" / "dashboards"
+    out_file = dashboards_dir / "game_probability_dashboard.html"
     dependencies = [
-        output_dir / "game_probability_he_data.json",
+        WORKSPACE / "output" / "game_probability_he_data.json",
         SRC_DIR / "dashboard" / "generate_probability_dashboard_html.py",
     ]
     if not out_file.exists() or out_file.stat().st_size == 0:
         return False
     out_mtime = out_file.stat().st_mtime
     return all(dep.exists() and dep.stat().st_mtime <= out_mtime for dep in dependencies)
+
+
+def should_skip_round_dealer_dashboard():
+    dashboards_dir = WORKSPACE / "output" / "dashboards"
+    out_file = dashboards_dir / "round_dealer_time_dashboard.html"
+    if not out_file.exists() or out_file.stat().st_size == 0:
+        return False
+    dependencies = [
+        WORKSPACE / "output" / "round_dealer_time_data.json",
+        SRC_DIR / "dashboard" / "generate_round_dealer_time_dashboard_html.py",
+    ]
+    out_mtime = out_file.stat().st_mtime
+    return all(dep.exists() and dep.stat().st_mtime <= out_mtime for dep in dependencies)
+
+
+def should_skip_round_dealer_ingest():
+    output_dir = WORKSPACE / "output"
+    out_file = output_dir / "round_dealer_time_data.json"
+    if not out_file.exists() or out_file.stat().st_size == 0:
+        return False
+    # Depend on the ingest script itself; ordering is enforced by pipeline sequence (step 13 runs before step 15)
+    deps = [
+        SRC_DIR / "ingest" / "round_dealer_time_ingest.py",
+    ]
+    out_mtime = out_file.stat().st_mtime
+    return all(dep.exists() and dep.stat().st_mtime <= out_mtime for dep in deps)
 
 
 def run_step(label, script_path):
@@ -353,55 +392,64 @@ def main():
             progress.update(label)
             continue
         # Skip individual analysis steps if outputs already exist
-        if label.startswith("[1/14]") and should_skip_whale_analysis():
+        if label.startswith("[1/16]") and should_skip_whale_analysis():
             print(f"\n    [SKIP] {script_path.name} - outputs already exist")
             progress.update(label)
             continue
-        if label.startswith("[2/14]") and should_skip_time_series():
+        if label.startswith("[2/16]") and should_skip_time_series():
             print(f"\n    [SKIP] {script_path.name} - outputs already exist")
             progress.update(label)
             continue
-        if label.startswith("[3/14]") and should_skip_chaser():
+        if label.startswith("[3/16]") and should_skip_chaser():
             print(f"\n    [SKIP] {script_path.name} - outputs already exist")
             progress.update(label)
             continue
-        if label.startswith("[4/14]") and should_skip_operator():
+        if label.startswith("[4/16]") and should_skip_operator():
             print(f"\n    [SKIP] {script_path.name} - outputs already exist")
             progress.update(label)
             continue
-        if label.startswith("[5/14]") and should_skip_heatmap():
+        if label.startswith("[5/16]") and should_skip_heatmap():
             print(f"\n    [SKIP] {script_path.name} - outputs already exist and inputs unchanged")
             progress.update(label)
             continue
-        if label.startswith("[6/14]") and should_skip_all_players_dossiers():
+        if label.startswith("[6/16]") and should_skip_all_players_dossiers():
             print(f"\n    [SKIP] {script_path.name} - outputs already exist and inputs unchanged")
             progress.update(label)
             continue
-        if label.startswith("[7/14]") and should_skip_player_behavior():
+        if label.startswith("[7/16]") and should_skip_player_behavior():
             print(f"\n    [SKIP] {script_path.name} - outputs already exist and inputs unchanged")
             progress.update(label)
             continue
-        if label.startswith("[8/14]") and should_skip_individual_dossiers():
+        if label.startswith("[8/16]") and should_skip_individual_dossiers():
             print(f"\n    [SKIP] {script_path.name} - outputs already exist and inputs unchanged")
             progress.update(label)
             continue
-        if label.startswith("[9/14]") and should_skip_prepare_dashboard():
+        if label.startswith("[9/16]") and should_skip_prepare_dashboard():
             print(f"\n    [SKIP] {script_path.name} - outputs already exist and inputs unchanged")
             progress.update(label)
             continue
-        if label.startswith("[10/14]") and should_skip_main_dashboard():
+        if label.startswith("[10/16]") and should_skip_main_dashboard():
             print(f"\n    [SKIP] {script_path.name} - outputs already exist and inputs unchanged")
             progress.update(label)
             continue
-        if label.startswith("[11/14]") and should_skip_behavior_dashboard():
+        if label.startswith("[11/16]") and should_skip_behavior_dashboard():
             print(f"\n    [SKIP] {script_path.name} - outputs already exist and inputs unchanged")
             progress.update(label)
             continue
-        if label.startswith("[12/14]") and should_skip_inject_dossier_tabs():
+        if label.startswith("[12/16]") and should_skip_inject_dossier_tabs():
             print(f"\n    [SKIP] {script_path.name} - dossier tabs already injected and current")
             progress.update(label)
             continue
-        if label.startswith("[14/14]") and should_skip_probability_dashboard():
+        # Step 13 (probability_he_ingest) intentionally has no skip guard - always runs to refresh
+        if label.startswith("[14/16]") and should_skip_probability_dashboard():
+            print(f"\n    [SKIP] {script_path.name} - output already exists and inputs unchanged")
+            progress.update(label)
+            continue
+        if label.startswith("[15/16]") and should_skip_round_dealer_ingest():
+            print(f"\n    [SKIP] {script_path.name} - output already exists and inputs unchanged")
+            progress.update(label)
+            continue
+        if label.startswith("[16/16]") and should_skip_round_dealer_dashboard():
             print(f"\n    [SKIP] {script_path.name} - output already exists and inputs unchanged")
             progress.update(label)
             continue
@@ -424,17 +472,19 @@ def main():
     print("  - output/dashboards/player_behavior_dashboard.html")
     print("  - output/dashboards/game_probability_dashboard.html")
     print("  - output/game_probability_he_data.json")
-    print("  - output/dashboard_data.json")
-    print("  - output/player_behavior_data.json")
-    print("  - output/all_players_index.json")
-    print("  - output/individual_dossiers_data.json")
-    print("  - output/dossier_chunks/chunk_*.js")
-    print("  - output/whale_analysis.csv")
-    print("  - output/chaser_detection.csv")
-    print("  - output/operator_performance.csv")
-    print("  - output/hourly_traffic.csv")
-    print("  - output/time_series_analysis.csv")
-    print("  - output/country_hourly_heatmap.csv")
+    print("  - output/data/dashboard_data.json")
+    print("  - output/data/player_behavior_data.json")
+    print("  - output/data/all_players_index_00.json ... all_players_index_26.json")
+    print("  - output/data/individual_dossiers_data.json")
+    print("  - output/chunks/dossier_chunks_00/ ... dossier_chunks_26/")
+    print("  - output/reports/whale_analysis.csv")
+    print("  - output/reports/chaser_detection.csv")
+    print("  - output/reports/operator_performance.csv")
+    print("  - output/reports/hourly_traffic.csv")
+    print("  - output/reports/time_series_analysis.csv")
+    print("  - output/reports/country_hourly_heatmap.csv")
+    print("  - output/dashboards/round_dealer_time_dashboard.html")
+    print("  - output/round_dealer_time_data.json")
     return 0
 
 
