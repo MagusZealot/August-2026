@@ -1,0 +1,193 @@
+      <!-- ========================================================================= -->
+      <!-- TAB 6: ALL PLAYER DOSSIERS (FULL DATABASE)                              -->
+      <!-- ========================================================================= -->
+      <section id="tab-players" class="tab-pane hidden space-y-6">
+        <!-- Hero -->
+        <div class="glass-card rounded-2xl p-5 bg-gradient-to-r from-amber-950/40 via-slate-900 to-slate-900 border border-amber-500/20">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-semibold">
+                <i class="fa-solid fa-database"></i> Full Database Player Forensics
+              </div>
+              <h2 class="text-2xl font-extrabold text-white tracking-tight mt-1">All Player Dossiers</h2>
+              <p class="text-xs text-slate-300">Complete coverage of <strong class="text-amber-300" id="playerDossierTotal">50,227</strong> players — every player carries a full round-by-round balance trajectory, cumulative P&amp;L, game mix, operator fingerprint, hourly activity and recent-round forensics. Trajectories lazy-load on demand from the dossier chunk files.</p>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="text-right font-mono text-xs text-slate-400">
+                <span class="text-amber-400 font-bold text-sm" id="playerDossierCount">0</span> Profiles Loaded
+              </div>
+              <button onclick="exportDossierCSV('players')" class="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 flex items-center gap-2 transition">
+                <i class="fa-solid fa-download text-amber-400"></i> Export All Players CSV
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Player Archetype Legend -->
+        <div class="glass-card rounded-2xl p-4">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <div class="text-xs text-slate-400 uppercase font-semibold"><i class="fa-solid fa-tags text-amber-400 mr-1"></i>Player Archetype Legend</div>
+              <span id="archetypeFilterCount" class="text-[10px] text-amber-400 font-mono"></span>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="clearArchetypeFiltersBtn" onclick="clearArchetypeFilters()" class="hidden px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-semibold border border-slate-700"><i class="fa-solid fa-times mr-1"></i>Clear</button>
+              <span class="text-[10px] text-slate-500">Click to filter · click again to clear</span>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2" id="archetypeLegend">
+            <!-- legend items injected by JS -->
+          </div>
+          <div class="mt-3 pt-3 border-t border-slate-800 text-[10px] text-slate-500 leading-relaxed">
+            <strong class="text-slate-400">How archetypes are assigned:</strong>
+            Each player is classified by their <span class="text-amber-300">Spike Multiplier</span> (max bet escalation after consecutive losses) and total wagered volume.
+            <span class="text-rose-400">Chasers</span> escalate bets rapidly after losses (spike ≥ 3x). <span class="text-amber-400">Whales</span> are the top 0.4% of players by total debit (≥ ~384M). A player can carry both a <span class="text-amber-400">Whale</span> flag and a <span class="text-rose-400">Chaser</span> flag simultaneously.
+          </div>
+        </div>
+
+        <!-- Search & Filter Bar -->
+        <div class="glass-card rounded-2xl p-4 flex flex-wrap gap-3 items-center">
+          <div class="flex-1 min-w-[200px] relative">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+            <input type="text" id="playerSearch" placeholder="Search player ID, country, archetype, operator..."
+              class="w-full pl-8 pr-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-amber-500"
+              oninput="filterPlayerDossiers()">
+          </div>
+          <select id="playerTierFilter" onchange="filterPlayerDossiers()"
+            class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 text-xs focus:outline-none focus:border-amber-500">
+            <option value="">All Tiers</option>
+            <option value="whale">Whales</option>
+            <option value="chaser">Chasers</option>
+            <option value="Extreme Chaser">Extreme Chaser (1000x+)</option>
+            <option value="Critical Chaser">Critical Chaser (100-999x)</option>
+            <option value="High Chaser">High Chaser</option>
+            <option value="VIP Whale">VIP Whales</option>
+            <option value="Lightning Burst Whale">Lightning Burst Whales</option>
+            <option value="Sustained Grinder Whale">Sustained Grinder Whales</option>
+            <option value="VIP High Roller">VIP High Rollers</option>
+            <option value="High Roller">High Rollers</option>
+            <option value="Mid Roller">Mid Rollers</option>
+            <option value="Active Player">Active Players</option>
+            <option value="Casual Player">Casual Players</option>
+          </select>
+          <select id="playerCountryFilter" onchange="filterPlayerDossiers()"
+            class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 text-xs focus:outline-none focus:border-amber-500">
+            <option value="">All Countries</option>
+          </select>
+          <select id="playerSortFilter" onchange="filterPlayerDossiers()"
+            class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 text-xs focus:outline-none focus:border-amber-500">
+            <option value="debit">Sort: Total Debit</option>
+            <option value="bets">Sort: Total Bets</option>
+            <option value="pnl">Sort: Net P&amp;L</option>
+            <option value="spike">Sort: Spike Multiplier</option>
+            <option value="avg_bet">Sort: Avg Bet Size</option>
+          </select>
+          <span class="text-xs text-slate-400 font-mono" id="playerFilterCount"></span>
+        </div>
+
+        <!-- Player Cards Grid -->
+        <div id="playerCardsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
+
+        <!-- Pagination Controls -->
+        <div class="glass-card rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 no-print">
+          <div class="flex items-center gap-2 text-xs text-slate-400">
+            <span>Rows per page</span>
+            <select id="playerPageSize" onchange="changePageSize()" class="px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 text-xs focus:outline-none">
+              <option value="60">60</option>
+              <option value="120">120</option>
+              <option value="240">240</option>
+            </select>
+          </div>
+          <div class="text-xs font-mono text-slate-300" id="playerPageInfo"></div>
+          <div class="flex items-center gap-2">
+            <button onclick="prevPlayerPage()" id="playerPrevBtn" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"><i class="fa-solid fa-chevron-left mr-1"></i>Prev</button>
+            <button onclick="nextPlayerPage()" id="playerNextBtn" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed">Next<i class="fa-solid fa-chevron-right ml-1"></i></button>
+          </div>
+        </div>
+
+        <!-- Player Dossier Panel (hidden until card click) -->
+        <div id="playerDossierPanel" class="hidden glass-card rounded-2xl p-6 space-y-6 border border-amber-500/30">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div>
+              <div id="dossierPlayerBadge" class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold mb-2"></div>
+              <h3 id="dossierPlayerTitle" class="text-xl font-extrabold text-white font-mono"></h3>
+              <p id="dossierPlayerSub" class="text-xs text-slate-400 mt-1"></p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="closePlayerDossier()" class="px-3 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 text-xs font-semibold border border-indigo-500/40 transition">
+                <i class="fa-solid fa-arrow-left mr-1"></i>Back to Browser
+              </button>
+              <button onclick="closePlayerDossier()" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm border border-slate-700">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- KPI Strip -->
+          <div id="dossierPlayerKPIs" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3"></div>
+
+          <!-- Trajectory loading indicator -->
+          <div id="dossierLoading" class="flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-900/70 border border-slate-800 text-xs text-slate-400">
+            <i class="fa-solid fa-spinner fa-spin text-amber-400"></i>
+            <span>Loading full balance trajectory from database chunk...</span>
+          </div>
+
+          <!-- Charts Row: Balance + P&L -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="rounded-xl bg-slate-900/60 border border-slate-800 p-4">
+              <div class="flex items-center justify-between mb-2">
+                <div class="text-xs text-slate-400 uppercase font-semibold"><i class="fa-solid fa-chart-line text-cyan-400 mr-1"></i>Full Balance Trajectory</div>
+                <div class="text-[10px] font-mono text-slate-500" id="dossierTrajPoints"></div>
+              </div>
+              <div id="dossierBalanceChart" style="height:240px;width:100%"></div>
+            </div>
+            <div class="rounded-xl bg-slate-900/60 border border-slate-800 p-4">
+              <div class="text-xs text-slate-400 uppercase font-semibold mb-2"><i class="fa-solid fa-chart-line text-rose-400 mr-1"></i>Cumulative P&amp;L Curve</div>
+              <div id="dossierPnlChart" style="height:240px;width:100%"></div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 rounded-xl bg-slate-900/60 border border-slate-800 p-4">
+              <div class="text-xs text-slate-400 uppercase font-semibold mb-2"><i class="fa-solid fa-clock text-amber-400 mr-1"></i>Hourly Betting Activity</div>
+              <div id="dossierHoursChart" style="height:200px;width:100%"></div>
+            </div>
+            <div class="rounded-xl bg-slate-900/60 border border-slate-800 p-4">
+              <div class="text-xs text-slate-400 uppercase font-semibold mb-2"><i class="fa-solid fa-dice text-emerald-400 mr-1"></i>Game Mix (by Bets)</div>
+              <div id="dossierGamesChart" style="height:200px;width:100%"></div>
+            </div>
+          </div>
+
+          <!-- Device + Recent Rounds -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="rounded-xl bg-slate-900/60 border border-slate-800 p-4">
+              <div class="text-xs text-slate-400 uppercase font-semibold mb-2"><i class="fa-solid fa-mobile-screen text-indigo-400 mr-1"></i>Device Split</div>
+              <div id="dossierDeviceChart" style="height:160px;width:100%"></div>
+            </div>
+            <div class="lg:col-span-2 rounded-xl bg-slate-900/60 border border-slate-800 p-4">
+              <div class="text-xs text-slate-400 uppercase font-semibold mb-2"><i class="fa-solid fa-list text-slate-400 mr-1"></i>Recent Rounds Forensics</div>
+              <div id="dossierRecentRoundsTable" class="overflow-auto max-h-44"></div>
+            </div>
+          </div>
+
+          <!-- Monthly Activity Calendar -->
+          <div class="rounded-xl bg-slate-900/60 border border-slate-800 p-4">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+              <div class="text-xs text-slate-400 uppercase font-semibold"><i class="fa-solid fa-calendar-days text-amber-400 mr-1"></i>Monthly Activity Calendar</div>
+              <div class="flex items-center gap-2">
+                <button onclick="dossierCalendarPrevMonth()" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700"><i class="fa-solid fa-chevron-left"></i></button>
+                <span id="dossierCalendarMonth" class="text-sm font-mono text-white min-w-[140px] text-center"></span>
+                <button onclick="dossierCalendarNextMonth()" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700"><i class="fa-solid fa-chevron-right"></i></button>
+              </div>
+            </div>
+            <div id="dossierCalendarGrid" class="grid grid-cols-7 gap-0.5"></div>
+            <div id="dossierDayDetail" class="hidden mt-4 p-3 rounded-lg bg-slate-800/50 border border-slate-700">
+              <div class="flex items-center justify-between mb-2">
+                <h4 id="dossierDayDetailTitle" class="text-xs text-slate-400 uppercase font-semibold"></h4>
+                <button onclick="closeDayDetail()" class="p-1 rounded hover:bg-slate-700 text-slate-400"><i class="fa-solid fa-xmark text-xs"></i></button>
+              </div>
+              <div id="dossierDayDetailContent" class="text-xs text-slate-300"></div>
+            </div>
+          </div>
+        </div>
+      </section>

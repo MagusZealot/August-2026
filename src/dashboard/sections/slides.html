@@ -1,0 +1,59 @@
+        <!-- SLIDE 7 -->
+        <div id="slide-7" class="slide glass-card rounded-2xl p-8 space-y-6 min-h-[580px]">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-bold border border-amber-500/30">
+            SLIDE 7 // INDIVIDUAL PLAYER FORENSICS
+          </div>
+          <h2 class="text-3xl font-black text-white">Player Dossier Deep-Dive: Anatomy of the Elite</h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+            <div class="space-y-4 text-sm text-slate-300">
+              <p>
+                <strong>42 Individual Profiles Compiled:</strong> Every top whale and flagged chaser reconstructed with balance trajectories, cumulative P&amp;L curves, game mix, hourly fingerprints and device splits.
+              </p>
+              <p>
+                <strong>Archetype Spectrum:</strong> From <strong>Lightning Burst Whales</strong> (sub-3-minute sessions) to <strong>Extreme Chasers</strong> escalating bets up to <strong>7,500x</strong> after consecutive losses.
+              </p>
+              <p>
+                <strong>Interactive:</strong> Each profile is clickable from the Whale Leaderboard, Chaser Registry and Operator tables — jump straight into any player's full forensic dossier.
+              </p>
+              <button onclick="togglePresentationMode(); setTimeout(() => switchTab('players'), 120)" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-900 text-xs font-bold shadow-lg shadow-amber-500/30 flex items-center gap-2 transition">
+                <i class="fa-solid fa-user-secret"></i> Browse All Player Dossiers
+              </button>
+            </div>
+            <div class="space-y-4">
+              <div class="text-xs text-slate-400 uppercase font-semibold"><i class="fa-solid fa-layer-group text-amber-400 mr-1"></i>Player Archetype Distribution</div>
+              <div id="slidePlayerArchChart" class="chart-box" style="height: 200px;"></div>
+              <div class="text-xs text-slate-400 uppercase font-semibold"><i class="fa-solid fa-crown text-amber-400 mr-1"></i>Top 8 Players by Total Debit</div>
+              <div id="slideTopPlayersChart" class="chart-box" style="height: 180px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SLIDE 8 -->
+        <div id="slide-8" class="slide glass-card rounded-2xl p-8 space-y-6 min-h-[580px]">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 text-xs font-bold border border-cyan-500/30">
+            SLIDE 8 // INDIVIDUAL OPERATOR INTELLIGENCE
+          </div>
+          <h2 class="text-3xl font-black text-white">Operator Dossier Deep-Dive: Brand-Level Economics</h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+            <div class="space-y-4 text-sm text-slate-300">
+              <p>
+                <strong>35 Brand Dossiers Compiled:</strong> Each B2B partner profiled with game-level hold margins, hourly load curves, device mix and its own top-player ecosystem.
+              </p>
+              <p>
+                <strong>Profit Concentration:</strong> <strong>m88provnd</strong> alone generates <strong>+3.26B GGR</strong> (99.7% of Vietnam), while Indonesian skins like <strong>mog803Hoki311</strong> squeeze up to <strong>8.24% hold</strong> per bet.
+              </p>
+              <p>
+                <strong>Interactive:</strong> Click any row in the Top 50 Partner table to open that operator's full dossier with per-game retention and whale concentration.
+              </p>
+              <button onclick="togglePresentationMode(); setTimeout(() => switchTab('opdossiers'), 120)" class="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-900 text-xs font-bold shadow-lg shadow-cyan-500/30 flex items-center gap-2 transition">
+                <i class="fa-solid fa-building-columns"></i> Browse All Operator Dossiers
+              </button>
+            </div>
+            <div class="space-y-4">
+              <div class="text-xs text-slate-400 uppercase font-semibold"><i class="fa-solid fa-sack-dollar text-emerald-400 mr-1"></i>Top 8 Operators by Net GGR</div>
+              <div id="slideOpGgrChart" class="chart-box" style="height: 200px;"></div>
+              <div class="text-xs text-slate-400 uppercase font-semibold"><i class="fa-solid fa-percent text-cyan-400 mr-1"></i>Hold Margin % (Top 8 by Volume)</div>
+              <div id="slideOpHoldChart" class="chart-box" style="height: 180px;"></div>
+            </div>
+          </div>
+        </div>
