@@ -74,6 +74,7 @@ August 2026/
 - **Whale & Chaser Group Dossiers**: Aggregate KPIs, risk tier distributions, behavioral archetypes
 - **Currency Standardization**: All amounts converted to PHP using date-relative historical rates (frankfurter.app)
 - **Three Linked Dashboards**: Cross-navigation between BI, Behavior, and Probability consoles
+- **Tabbed Trend Views + Date Range Selector**: On the Probability & HE console, the "HE trend for selected game" and "Probability and threshold trend" charts are consolidated into one tabbed panel (same `.tab-pane` / active-highlight pattern as the BI console). Start Date and End Date inputs sit alongside the existing game/period filters and dynamically filter both trend tabs; a Reset button clears the range and falls back to the trend window.
 
 ---
 

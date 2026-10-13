@@ -39,8 +39,8 @@ def build_dashboard():
     .hero { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 18px; margin-bottom: 18px; }
     .hero h2 { margin: 0; font-size: 18px; }
     .hero p, .muted { color: #94a3b8; font-size: 12px; }
-    .filters { display: flex; flex-wrap: wrap; gap: 10px; }
-    select { padding: 9px 12px; border: 1px solid #344258; border-radius: 8px; background: #111b2d; color: #e2e8f0; }
+    .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+    select, input[type="date"] { padding: 9px 12px; border: 1px solid #344258; border-radius: 8px; background: #111b2d; color: #e2e8f0; font-family: inherit; font-size: 12px; }
     .kpis { display: grid; grid-template-columns: repeat(5, minmax(130px, 1fr)); gap: 12px; margin-bottom: 16px; }
     .card { border: 1px solid #24334a; border-radius: 14px; background: linear-gradient(145deg, #121d30e8, #0c1423f2); box-shadow: 0 10px 30px #0002; }
     .kpi { padding: 16px; }
@@ -58,6 +58,15 @@ def build_dashboard():
     td:first-child, th:first-child { text-align: left; }
     .alert { margin: 14px 0; padding: 12px 15px; border: 1px solid #854d0e; border-radius: 10px; background: #713f121f; color: #fcd34d; font-size: 12px; }
     .alert.good { border-color: #166534; background: #14532d22; color: #86efac; }
+    .trend-tabs { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 15px 0; border-bottom: 1px solid #253247; margin: -15px -15px 0; }
+    .trend-tab-btn { padding: 8px 14px; border: 1px solid #344258; border-radius: 9px 9px 0 0; background: #111b2d; color: #b9c7da; font-size: 12px; font-weight: 600; cursor: pointer; transition: all .15s ease; display: inline-flex; align-items: center; gap: 7px; }
+    .trend-tab-btn:hover { border-color: #34d399; color: #6ee7b7; }
+    .trend-tab-btn.active { background: #059669; border-color: #34d399; color: #ffffff; box-shadow: 0 4px 14px 0 #05966959; }
+    .trend-pane { display: none; padding-top: 12px; }
+    .trend-pane.active { display: block; animation: fadeIn .3s ease-in-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    .date-range-reset { padding: 9px 12px; border: 1px solid #344258; border-radius: 8px; background: #111b2d; color: #b9c7da; font-size: 12px; cursor: pointer; transition: all .15s ease; }
+    .date-range-reset:hover { border-color: #fb7185; color: #fda4af; }
     footer { padding: 22px 0 8px; color: #77869c; font-size: 11px; }
     @media (max-width: 900px) { .kpis { grid-template-columns: repeat(3, 1fr); } .grid { grid-template-columns: 1fr; } .wide { grid-column: auto; } }
     @media (max-width: 560px) { main { padding: 14px; } .kpis { grid-template-columns: repeat(2, 1fr); } .chart { height: 300px; } }
@@ -83,6 +92,9 @@ def build_dashboard():
       <div class="filters">
         <label class="muted" for="gameFilter">Trend game<br><select id="gameFilter"></select></label>
         <label class="muted" for="periodFilter">Trend window<br><select id="periodFilter"><option value="90">Latest 90 days</option><option value="365">Latest 365 days</option><option value="all">All available dates</option></select></label>
+        <label class="muted" for="startDate">Start date<br><input type="date" id="startDate"></label>
+        <label class="muted" for="endDate">End date<br><input type="date" id="endDate"></label>
+        <button type="button" class="date-range-reset" id="resetDateRange" title="Clear the date range and fall back to the trend window"><i class="fa-solid fa-rotate-left"></i> Reset range</button>
       </div>
     </section>
     <div id="coverageAlert"></div>
@@ -90,8 +102,22 @@ def build_dashboard():
     <section class="grid">
       <article class="card chart-card"><h3>Average actual vs expected HE by game</h3><div class="muted">Daily bet-place records pooled across the selected history</div><div id="heCompare" class="chart"></div></article>
       <article class="card chart-card"><h3>Probability vs expected probability and threshold</h3><div class="muted">Compare the observed probability with the model and configured limit</div><div id="probCompare" class="chart"></div></article>
-      <article class="card chart-card"><h3>HE trend for selected game</h3><div class="muted">Daily actual and expected house edge</div><div id="heTrend" class="chart"></div></article>
-      <article class="card chart-card"><h3>Probability and threshold trend</h3><div class="muted">Daily averages for the selected game</div><div id="probTrend" class="chart"></div></article>
+      <article class="card chart-card wide" id="trendPanel">
+        <div class="trend-tabs" role="tablist" aria-label="Trend views">
+          <button type="button" class="trend-tab-btn active" role="tab" aria-selected="true" aria-controls="pane-heTrend" onclick="switchTrendTab('he')"><i class="fa-solid fa-chart-line"></i> HE trend for selected game</button>
+          <button type="button" class="trend-tab-btn" role="tab" aria-selected="false" aria-controls="pane-probTrend" onclick="switchTrendTab('prob')"><i class="fa-solid fa-percent"></i> Probability and threshold trend</button>
+        </div>
+        <div class="trend-pane active" id="pane-heTrend" role="tabpanel">
+          <h3>HE trend for selected game</h3>
+          <div class="muted">Daily actual and expected house edge · honours the start/end date range</div>
+          <div id="heTrend" class="chart"></div>
+        </div>
+        <div class="trend-pane" id="pane-probTrend" role="tabpanel">
+          <h3>Probability and threshold trend</h3>
+          <div class="muted">Daily averages for the selected game · honours the start/end date range</div>
+          <div id="probTrend" class="chart"></div>
+        </div>
+      </article>
       <article class="card chart-card wide"><h3>Latest bet-place relationship: actual probability vs actual HE</h3><div class="muted">Each point is a bet place on the latest billing date; triangles indicate probability above threshold</div><div id="relationship" class="chart"></div></article>
       <article class="card chart-card wide"><h3>Game type summary</h3><div class="table-wrap"><table><thead><tr><th>Game</th><th>Days</th><th>HE rows</th><th>Actual HE</th><th>Expected HE</th><th>HE delta</th><th>Actual prob.</th><th>Expected prob.</th><th>Threshold</th><th>Breach rows %</th></tr></thead><tbody id="summaryRows"></tbody></table></div></article>
     </section>
@@ -165,13 +191,17 @@ def build_dashboard():
       const chosen = selected === '__all__' ? types.map(game => game.game_type) : [selected];
       const cutoff = days === 'all' ? null : new Date();
       if (cutoff) cutoff.setDate(cutoff.getDate() - Number(days));
+      const range = getDateRange();
       return chosen.map((game, index) => ({
         name: game,
         type: 'line',
         connectNulls: false,
         showSymbol: false,
         smooth: true,
-        data: pair(seriesByGame, game).filter(([day]) => !cutoff || new Date(`${day}T00:00:00`) >= cutoff).map(([day, value]) => [day, value]),
+        data: pair(seriesByGame, game).filter(([day]) => {
+          if (cutoff && new Date(`${day}T00:00:00`) < cutoff) return false;
+          return inDateRange(day);
+        }).map(([day, value]) => [day, value]),
         itemStyle: { color: colors[index % colors.length] },
         lineStyle: { width: 2 }
       }));
@@ -200,6 +230,53 @@ def build_dashboard():
           ...selectedTrendValues(DATA.series_threshold, selected, days).map(series => ({ ...series, name: `${series.name} threshold`, lineStyle: { ...series.lineStyle, type: 'dotted' } }))
         ]
       }, true);
+    }
+
+    function switchTrendTab(which) {
+      document.querySelectorAll('.trend-pane').forEach(pane => pane.classList.remove('active'));
+      document.querySelectorAll('.trend-tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+        btn.setAttribute('aria-selected', 'false');
+      });
+      const pane = document.getElementById(`pane-${which === 'he' ? 'heTrend' : 'probTrend'}`);
+      if (pane) pane.classList.add('active');
+      const btn = document.querySelector(`.trend-tab-btn[onclick="switchTrendTab('${which}')"]`);
+      if (btn) { btn.classList.add('active'); btn.setAttribute('aria-selected', 'true'); }
+      setTimeout(() => charts[which === 'he' ? 'heTrend' : 'probTrend'].resize(), 50);
+    }
+
+    function getDateRange() {
+      const start = document.getElementById('startDate').value;
+      const end = document.getElementById('endDate').value;
+      return { start: start || null, end: end || null };
+    }
+
+    function inDateRange(day) {
+      const { start, end } = getDateRange();
+      if (start && day < start) return false;
+      if (end && day > end) return false;
+      return true;
+    }
+
+    function initDateRangeBounds() {
+      const dates = [...Object.values(DATA.series_he || {}), ...Object.values(DATA.series_expected_he || {}),
+                     ...Object.values(DATA.series_actual_probability || {}), ...Object.values(DATA.series_expected_probability || {}),
+                     ...Object.values(DATA.series_threshold || {})].flat().map(([day]) => day).sort();
+      const min = DATA.meta.billing_date_min || dates[0] || '';
+      const max = DATA.meta.billing_date_max || dates[dates.length - 1] || '';
+      const startInput = document.getElementById('startDate');
+      const endInput = document.getElementById('endDate');
+      for (const input of [startInput, endInput]) {
+        input.min = min;
+        input.max = max;
+      }
+      return { min, max };
+    }
+
+    function resetDateRange() {
+      document.getElementById('startDate').value = '';
+      document.getElementById('endDate').value = '';
+      renderTrends();
     }
 
     function renderRelationship() {
@@ -238,9 +315,13 @@ def build_dashboard():
     }
 
     renderKpis();
+    initDateRangeBounds();
     render();
     gameFilter.addEventListener('change', render);
     document.getElementById('periodFilter').addEventListener('change', renderTrends);
+    document.getElementById('startDate').addEventListener('change', renderTrends);
+    document.getElementById('endDate').addEventListener('change', renderTrends);
+    document.getElementById('resetDateRange').addEventListener('click', resetDateRange);
     window.addEventListener('resize', () => Object.values(charts).forEach(chart => chart.resize()));
   </script>
 </body>
