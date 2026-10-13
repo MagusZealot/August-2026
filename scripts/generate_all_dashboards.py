@@ -66,6 +66,10 @@ STEPS = [
      SRC_DIR / "ingest" / "round_dealer_time_ingest.py"),
     ("[16/16] Round dealer time dashboard",
      SRC_DIR / "dashboard" / "generate_round_dealer_time_dashboard_html.py"),
+    ("[17/17] Refresh round table time source data",
+     SRC_DIR / "ingest" / "round_table_time_ingest.py"),
+    ("[18/17] Round table time dashboard",
+     SRC_DIR / "dashboard" / "generate_round_table_time_dashboard_html.py"),
 ]
 
 
@@ -327,12 +331,12 @@ def should_skip_probability_dashboard():
 
 
 def should_skip_round_dealer_dashboard():
-    dashboards_dir = WORKSPACE / "output" / "dashboards"
-    out_file = dashboards_dir / "round_dealer_time_dashboard.html"
+    output_dir = WORKSPACE / "output" / "dashboards"
+    out_file = output_dir / "round_dealer_time_dashboard.html"
     if not out_file.exists() or out_file.stat().st_size == 0:
         return False
     dependencies = [
-        WORKSPACE / "output" / "round_dealer_time_data.json",
+        output_dir / "round_dealer_time_data.json",
         SRC_DIR / "dashboard" / "generate_round_dealer_time_dashboard_html.py",
     ]
     out_mtime = out_file.stat().st_mtime
@@ -344,9 +348,35 @@ def should_skip_round_dealer_ingest():
     out_file = output_dir / "round_dealer_time_data.json"
     if not out_file.exists() or out_file.stat().st_size == 0:
         return False
-    # Depend on the ingest script itself; ordering is enforced by pipeline sequence (step 13 runs before step 15)
+    # Depend on the ingest script itself and the manifest
     deps = [
         SRC_DIR / "ingest" / "round_dealer_time_ingest.py",
+        output_dir / "game_probability_he_data.json",  # depends on other pipelines completing first
+    ]
+    out_mtime = out_file.stat().st_mtime
+    return all(dep.exists() and dep.stat().st_mtime <= out_mtime for dep in deps)
+
+
+def should_skip_round_table_dashboard():
+    output_dir = WORKSPACE / "output" / "dashboards"
+    out_file = output_dir / "round_table_time_dashboard.html"
+    if not out_file.exists() or out_file.stat().st_size == 0:
+        return False
+    dependencies = [
+        output_dir / "round_table_time_data.json",
+        SRC_DIR / "dashboard" / "generate_round_table_time_dashboard_html.py",
+    ]
+    out_mtime = out_file.stat().st_mtime
+    return all(dep.exists() and dep.stat().st_mtime <= out_mtime for dep in dependencies)
+
+
+def should_skip_round_table_ingest():
+    output_dir = WORKSPACE / "output"
+    out_file = output_dir / "round_table_time_data.json"
+    if not out_file.exists() or out_file.stat().st_size == 0:
+        return False
+    deps = [
+        SRC_DIR / "ingest" / "round_table_time_ingest.py",
     ]
     out_mtime = out_file.stat().st_mtime
     return all(dep.exists() and dep.stat().st_mtime <= out_mtime for dep in deps)
@@ -450,6 +480,14 @@ def main():
             progress.update(label)
             continue
         if label.startswith("[16/16]") and should_skip_round_dealer_dashboard():
+            print(f"\n    [SKIP] {script_path.name} - output already exists and inputs unchanged")
+            progress.update(label)
+            continue
+        if label.startswith("[17/17]") and should_skip_round_table_ingest():
+            print(f"\n    [SKIP] {script_path.name} - output already exists and inputs unchanged")
+            progress.update(label)
+            continue
+        if label.startswith("[18/17]") and should_skip_round_table_dashboard():
             print(f"\n    [SKIP] {script_path.name} - output already exists and inputs unchanged")
             progress.update(label)
             continue

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the standalone round dealer time dashboard."""
+"""Generate the standalone round dealer time dashboard — with dealer history."""
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -32,7 +32,7 @@ def build_dashboard():
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Round Dealer Time & Shift Performance Dashboard</title>
+  <title>Round Dealer Time & Dealer Progress Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <style>
@@ -51,11 +51,11 @@ def build_dashboard():
     .hero p, .muted { color: #94a3b8; font-size: 12px; }
     .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
     select, input[type="date"] { padding: 9px 12px; border: 1px solid #344258; border-radius: 8px; background: #111b2d; color: #e2e8f0; font-family: inherit; font-size: 12px; }
-    .kpis { display: grid; grid-template-columns: repeat(5, minmax(130px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .kpis { display: grid; grid-template-columns: repeat(6, minmax(110px, 1fr)); gap: 10px; margin-bottom: 16px; }
     .card { border: 1px solid #24334a; border-radius: 14px; background: linear-gradient(145deg, #121d30e8, #0c1423f2); box-shadow: 0 10px 30px #0002; }
     .kpi { padding: 16px; }
     .kpi label { display: block; margin-bottom: 8px; color: #91a2ba; font-size: 10px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
-    .kpi strong { font: 700 21px ui-monospace, Consolas, monospace; color: #f8fafc; }
+    .kpi strong { font: 700 18px ui-monospace, Consolas, monospace; color: #f8fafc; }
     .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
     .chart-card { min-width: 0; padding: 15px; }
     .chart-card h3 { margin: 0 0 3px; font-size: 14px; }
@@ -74,14 +74,14 @@ def build_dashboard():
     .date-range-reset { padding: 9px 12px; border: 1px solid #344258; border-radius: 8px; background: #111b2d; color: #b9c7da; font-size: 12px; cursor: pointer; transition: all .15s ease; }
     .date-range-reset:hover { border-color: #fb7185; color: #fda4af; }
     footer { padding: 22px 0 8px; color: #77869c; font-size: 11px; }
-    @media (max-width: 900px) { .kpis { grid-template-columns: repeat(3, 1fr); } .grid { grid-template-columns: 1fr; } .wide { grid-column: auto; } }
+    @media (max-width: 900px) { .kpis { grid-template-columns: repeat(4, 1fr); } .grid { grid-template-columns: 1fr; } .wide { grid-column: auto; } }
     @media (max-width: 560px) { main { padding: 14px; } .kpis { grid-template-columns: repeat(2, 1fr); } .chart { height: 300px; } }
   </style>
 </head>
 <body>
   <header>
     <div>
-      <h1><i class="fa-solid fa-clock" style="color:#34d399"></i> Round Dealer Time & Shift Performance</h1>
+      <h1><i class="fa-solid fa-clock" style="color:#34d399"></i> Round Dealer Time & Dealer Progress</h1>
       <p id="feedStatus">Loading latest dealer time feed…</p>
     </div>
     <nav aria-label="Dashboards">
@@ -92,8 +92,8 @@ def build_dashboard():
   <main>
     <section class="hero">
       <div>
-        <h2>Every game at a glance: combined trends and per-game detail</h2>
-        <p>Percent values follow the source feed. Shift breaches are actual duration above threshold.</p>
+        <h2>Dealer timing performance across games and dates</h2>
+        <p>AVG_TIMEDIFF = actual mean round duration (hours). Breach when actual exceeds expected.</p>
       </div>
       <div class="filters">
         <label class="muted" for="periodFilter">Trend window<br><select id="periodFilter"><option value="90">Latest 90 days</option><option value="365">Latest 365 days</option><option value="all">All available dates</option></select></label>
@@ -107,15 +107,26 @@ def build_dashboard():
     <section class="grid">
       <article class="card chart-card wide" id="combinedPanel">
         <h3>Combined Summary — all games</h3>
-        <div class="muted" id="combinedNote">Pooled daily means across every game type · follows the trend window and date range</div>
+        <div class="muted" id="combinedNote">Pooled daily means across every dealer-game combination · follows the trend window and date range</div>
       </article>
       <article class="card chart-card"><h3>Overall duration trend — all games</h3><div class="muted">Pooled daily mean actual vs expected round duration</div><div id="combinedDuration" class="chart"></div></article>
-      <article class="card chart-card"><h3>Overall win probability and threshold trend — all games</h3><div class="muted">Pooled daily mean actual vs expected wins and threshold</div><div id="combinedWin" class="chart"></div></article>
-      <article class="card chart-card"><h3>Average actual vs expected duration by game</h3><div class="muted" id="durationCompareNote">Daily bet-place records pooled across the selected history</div><div id="durationCompare" class="chart"></div></article>
-      <article class="card chart-card"><h3>Wins vs expected wins and threshold</h3><div class="muted" id="winCompareNote">Compare the observed wins with the model and configured limit</div><div id="winCompare" class="chart"></div></article>
+      <article class="card chart-card"><h3>Overall breach rate — all games</h3><div class="muted">Pooled daily % of dealer rounds above expected duration</div><div id="combinedBreach" class="chart"></div></article>
+      <article class="card chart-card"><h3>Top breach dealers</h3><div class="muted">Dealers with highest breach rates across selected history</div><div id="breachDealers" class="chart"></div></article>
       <div class="game-sections" id="gameSections"></div>
-      <article class="card chart-card wide"><h3>Latest bet-place relationship: actual duration vs actual wins</h3><div class="muted">Each point is a bet place on the latest billing date; triangles indicate duration above threshold</div><div id="relationship" class="chart"></div></article>
-      <article class="card chart-card wide"><h3>Game type summary</h3><div class="table-wrap"><table><thead><tr><th>Game</th><th>Days</th><th>HE rows</th><th>Actual Duration</th><th>Expected Duration</th><th>Duration delta</th><th>Actual Wins</th><th>Expected Wins</th><th>Win delta</th><th>Threshold</th><th>Breach rows %</th></tr></thead><tbody id="summaryRows"></tbody></table></div></article>
+      <article class="card chart-card wide">
+        <h3>Latest day: actual vs expected duration by dealer</h3>
+        <div class="muted">Each point is a dealer round on the latest billing date; triangles indicate above-expected duration</div>
+        <div id="relationship" class="chart"></div>
+      </article>
+      <article class="card chart-card wide">
+        <h3>Dealer progress over time</h3>
+        <div class="muted">Select a dealer below to see their timing progression across dates and game types</div>
+        <select id="dealerSelect" style="padding: 9px 12px; border: 1px solid #344258; border-radius: 8px; background: #111b2d; color: #e2e8f0; font-family: inherit; font-size: 12px; width: 100%; margin-bottom: 12px;">
+          <option value="">-- Select dealer --</option>
+        </select>
+        <div id="dealerProgress" style="height: 300px; min-width: 600px;"></div>
+      </article>
+      <article class="card chart-card wide"><h3>Dealer type summary</h3><div class="table-wrap"><table><thead><tr><th>Dealer</th><th>Total Rows</th><th>Date Range</th><th>Games</th><th>Mean Actual</th><th>Mean Expected</th><th>Breach %</th></th></tr></thead><tbody id="dealerSummaries"></tbody></table></div></article>
     </section>
     <footer>Source: daily published CSV snapshots. Missing dates are retained as gaps; no metric is interpolated. Refresh this dashboard by running the dashboard pipeline.</footer>
   </main>
@@ -123,7 +134,7 @@ def build_dashboard():
   <script>
     const DATA = JSON.parse(document.getElementById('round-dealer-time-data').textContent);
     const colors = ['#38bdf8','#34d399','#fbbf24','#c084fc','#fb7185','#2dd4bf','#a3e635','#f97316'];
-    const chartIds = ['durationCompare','winCompare','combinedDuration','combinedWin','relationship'];
+    const chartIds = ['dealerProgress','combinedDuration','combinedBreach','breachDealers','relationship'];
     const charts = Object.fromEntries(chartIds.map(id => [id, echarts.init(document.getElementById(id))]));
     const gameCharts = [];
     const number = value => value == null ? '—' : `${Number(value).toFixed(2)}h`;
@@ -143,6 +154,16 @@ def build_dashboard():
       ]
     };
     const types = DATA.game_types || [];
+    const allDealers = DATA.dealers || [];
+
+    // Build dealer options
+    const dealerSelect = document.getElementById('dealerSelect');
+    allDealers.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.dealer_id;
+      opt.textContent = `${escapeHtml(d.dealer_id)} — ${d.total_rows} rows, ${d.games_count} games`;
+      dealerSelect.appendChild(opt);
+    });
 
     function renderKpis() {
       const m = DATA.meta;
@@ -150,19 +171,21 @@ def build_dashboard():
         ['Latest snapshot', m.latest_file_date],
         ['Billing date range', `${m.billing_date_min} – ${m.billing_date_max}`],
         ['Game types', m.game_types.length],
-        ['Bet places', m.bet_places_tracked],
-        ['Missing snapshots', m.files_missing_count]
+        ['Dealers tracked', m.dealers_tracked],
+        ['Null duration rows', m.null_duration_rows],
+        ['Unique dealer-game entries', m.dealer_entries_count]
       ];
       document.getElementById('kpis').innerHTML = tiles.map(([label, value]) => `<div class="card kpi"><label>${escapeHtml(label)}</label><strong>${escapeHtml(value)}</strong></div>`).join('');
-      document.getElementById('feedStatus').textContent = `Updated ${m.generated_at} · ${Number(m.files_available).toLocaleString()} snapshots · ${Number(m.unique_keys).toLocaleString()} unique daily bet-place records`;
+      document.getElementById('feedStatus').textContent = `Updated ${m.generated_at} · ${Number(m.files_available).toLocaleString()} snapshots · ${Number(m.unique_keys).toLocaleString()} unique dealer-game records`;
       const gaps = DATA.missing_dates || [];
       document.getElementById('coverageAlert').innerHTML = gaps.length
         ? `<div class="alert"><strong>${gaps.length} missing snapshot dates</strong> after the first published file. Missing days are excluded from averages and shown as a coverage gap. Recent gaps: ${gaps.slice(-8).map(escapeHtml).join(', ')}</div>`
         : '<div class="alert good">No missing snapshot dates are currently recorded after feed start.</div>';
-      document.getElementById('summaryRows').innerHTML = types.map(game => `<tr>
-        <td>${escapeHtml(game.game_type)}</td><td>${game.days}</td><td>${game.dur_rows}</td>
-        <td>${number(game.mean_actual_duration)}</td><td>${number(game.mean_expected_duration)}</td><td>${number(game.mean_duration_delta)}</td>
-        <td>${number(game.mean_actual_wins)}</td><td>${number(game.mean_expected_wins)}</td><td>${number(game.mean_win_delta)}</td><td>${Number(game.breach_pct).toFixed(2)}%</td>
+      document.getElementById('dealerSummaries').innerHTML = DATA.dealers.map(d => `<tr>
+        <td>${escapeHtml(d.dealer_id)}</td><td>${d.total_rows}</td>
+        <td>${escapeHtml(d.date_range)}</td><td>${d.games_count}</td>
+        <td>${number(d.mean_actual_duration)}</td><td>${number(d.mean_expected_duration)}</td>
+        <td>${Number(d.breach_pct).toFixed(2)}%</td>
       </tr>`).join('');
     }
 
@@ -199,56 +222,20 @@ def build_dashboard():
       return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
     }
 
-    function comparisonValues(seriesKey, meanKey) {
-      const { start, end } = getDateRange();
-      const precomputed = () => types.map(game => game[meanKey]);
-      if (!start && !end) return precomputed();
-      return types.map(game => {
-        const values = pair(DATA[seriesKey], game.game_type).filter(([day]) => inDateRange(day)).map(([, value]) => value).filter(value => value != null);
-        return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
-      });
-    }
-
-    function updateComparisonNotes() {
-      const { start, end } = getDateRange();
-      const suffix = (start || end) ? ` · ${start || '…'} to ${end || '…'}` : '';
-      document.getElementById('durationCompareNote').textContent = `Daily bet-place records pooled across the selected history${suffix}`;
-      document.getElementById('winCompareNote').textContent = `Compare the observed wins with the model and configured limit${suffix}`;
-    }
-
     function renderGameComparisons() {
       const names = types.map(game => game.game_type);
-      charts.durationCompare.setOption({
-        color: ['#38bdf8','#fbbf24'], tooltip: { ...tooltipStyle, trigger: 'axis' }, legend: { textStyle: { color: '#cbd5e1' } },
-        grid: { left: 55, right: 18, top: 38, bottom: 72 },
-        xAxis: { type: 'category', data: names, axisLabel: { ...axisStyle.axisLabel, rotate: 25 } }, yAxis: { type: 'value', name: 'Duration (h)', ...axisStyle },
-        series: [
-          { name: 'Actual duration', type: 'bar', data: comparisonValues('series_duration', 'mean_actual_duration'), itemStyle: { borderRadius: [4,4,0,0] } },
-          { name: 'Expected duration', type: 'bar', data: comparisonValues('series_expected_duration', 'mean_expected_duration'), itemStyle: { borderRadius: [4,4,0,0] } }
-        ]
-      });
-      charts.winCompare.setOption({
-        color: ['#38bdf8','#a78bfa','#fb7185'], tooltip: { ...tooltipStyle, trigger: 'axis' }, legend: { textStyle: { color: '#cbd5e1' } },
-        grid: { left: 55, right: 18, top: 38, bottom: 72 },
-        xAxis: { type: 'category', data: names, axisLabel: { ...axisStyle.axisLabel, rotate: 25 } }, yAxis: { type: 'value', name: 'Wins', ...axisStyle },
-        series: [
-          { name: 'Actual wins', type: 'bar', data: comparisonValues('series_actual_wins', 'mean_actual_wins'), itemStyle: { borderRadius: [4,4,0,0] } },
-          { name: 'Expected wins', type: 'bar', data: comparisonValues('series_expected_wins', 'mean_expected_wins'), itemStyle: { borderRadius: [4,4,0,0] } },
-          { name: 'Threshold', type: 'bar', data: comparisonValues('series_threshold', 'mean_threshold'), itemStyle: { borderRadius: [4,4,0,0] } }
-        ]
-      });
-      updateComparisonNotes();
+      /* dealerCompare removed — replaced by dealerSelect-driven chart */
     }
 
     function renderCombinedSummary() {
       const rows = (DATA.daily || []).filter(row => inTimeframe(row.date));
-      const totalRows = types.reduce((sum, game) => sum + (game.dur_rows || 0), 0);
-      const totalBreaches = types.reduce((sum, game) => sum + (game.breaches || 0), 0);
+      const totalRows = DATA.dealers.reduce((sum, d) => sum + d.total_rows, 0);
+      const totalBreaches = DATA.dealers.reduce((sum, d) => sum + d.total_breaches, 0);
       const pooledBreach = totalRows ? (totalBreaches / totalRows * 100) : null;
       const { start, end } = getDateRange();
       const suffix = (start || end) ? ` · ${start || '…'} to ${end || '…'}` : '';
       document.getElementById('combinedNote').textContent =
-        `${types.length} game types · ${(DATA.bet_places || []).length} bet places · ${Number(totalRows).toLocaleString()} pooled rows · pooled breach rate ${pooledBreach == null ? '—' : `${pooledBreach.toFixed(2)}%`} · ${rows.length} days in view${suffix}`;
+        `${DATA.dealers.length} dealers · ${totalRows} total records · ${pooledBreach == null ? '—' : `${pooledBreach.toFixed(2)}%`} pooled breach rate · ${rows.length} days in view${suffix}`;
       charts.combinedDuration.setOption({
         ...trendCommon, yAxis: { ...trendCommon.yAxis, name: 'Duration (h)' },
         series: [
@@ -256,12 +243,10 @@ def build_dashboard():
           { name: 'Expected duration', type: 'line', showSymbol: false, smooth: true, connectNulls: false, data: rows.map(row => [row.date, row.mean_expected_duration]), lineStyle: { width: 2, type: 'dashed' }, itemStyle: { color: '#fbbf24' } }
         ]
       }, true);
-      charts.combinedWin.setOption({
-        ...trendCommon, yAxis: { ...trendCommon.yAxis, name: 'Wins' },
+      charts.combinedBreach.setOption({
+        ...trendCommon, yAxis: { ...trendCommon.yAxis, name: 'Breach %' },
         series: [
-          { name: 'Actual wins', type: 'line', showSymbol: false, smooth: true, connectNulls: false, data: rows.map(row => [row.date, row.mean_actual_wins]), lineStyle: { width: 2 }, itemStyle: { color: '#38bdf8' } },
-          { name: 'Expected wins', type: 'line', showSymbol: false, smooth: true, connectNulls: false, data: rows.map(row => [row.date, row.mean_expected_wins]), lineStyle: { width: 2, type: 'dashed' }, itemStyle: { color: '#a78bfa' } },
-          { name: 'Threshold', type: 'line', showSymbol: false, smooth: true, connectNulls: false, data: rows.map(row => [row.date, row.mean_threshold]), lineStyle: { width: 2, type: 'dotted' }, itemStyle: { color: '#fb7185' } }
+          { name: 'Breach rate', type: 'line', showSymbol: false, smooth: true, connectNulls: false, data: rows.map(row => [row.date, row.breach_pct]), lineStyle: { width: 2 }, itemStyle: { color: '#f97316' } }
         ]
       }, true);
     }
@@ -276,106 +261,135 @@ def build_dashboard():
           <h3>${escapeHtml(game.game_type)}</h3>
           <div class="muted" id="gameMeta-${index}"></div>
           <div class="table-wrap"><table>
-            <thead><tr><th>Bet place</th><th>Days</th><th>Actual Duration</th><th>Expected Duration</th><th>Duration delta</th><th>Actual Wins</th><th>Expected Wins</th><th>Win delta</th><th>Threshold</th><th>Breach rows %</th></tr></thead>
+            <thead><tr><th>Dealer</th><th>Actual Duration</th><th>Expected Duration</th><th>Breach %</th></tr></thead>
             <tbody id="gameRows-${index}"></tbody>
           </table></div>
-          <div class="grid nested">
-            <article class="card chart-card"><h3>Duration trend — ${escapeHtml(game.game_type)}</h3><div class="muted">Daily actual and expected round duration · honours the trend window and date range</div><div id="gameDur-${index}" class="chart"></div></article>
-            <article class="card chart-card"><h3>Wins and threshold trend — ${escapeHtml(game.game_type)}</h3><div class="muted">Daily average wins and threshold · honours the trend window and date range</div><div id="gameWin-${index}" class="chart"></div></article>
-          </div>`;
+        `;
         fragment.appendChild(article);
       });
       container.appendChild(fragment);
-      types.forEach((game, index) => {
-        gameCharts.push({
-          dur: echarts.init(document.getElementById(`gameDur-${index}`)),
-          win: echarts.init(document.getElementById(`gameWin-${index}`))
-        });
-      });
     }
 
     function renderGameSections() {
       types.forEach((game, index) => {
         const name = game.game_type;
-        const daysInRange = timeframeSeries(DATA.series_duration, name).length;
-        const actualDur = timeframeMean(DATA.series_duration, name);
-        const expectedDur = timeframeMean(DATA.series_expected_duration, name);
-        const actualWin = timeframeMean(DATA.series_actual_wins, name);
-        const expectedWin = timeframeMean(DATA.series_expected_wins, name);
-        const threshold = timeframeMean(DATA.series_threshold, name);
-        const breach = timeframeMean(DATA.series_breach, name);
-        document.getElementById(`gameMeta-${index}`).textContent =
-          `${Number(game.rows).toLocaleString()} rows · ${game.days} days on record · ${game.first_date} – ${game.last_date} · ${game.bet_places} bet places · the game row follows the trend window and date range; bet-place rows are full-history pooled means`;
-        const rows = [`<tr class="table-total"><td>${escapeHtml(name)} — all bet places</td><td>${daysInRange}</td><td>${number(actualDur)}</td><td>${number(expectedDur)}</td><td>${number(actualDur != null && expectedDur != null ? actualDur - expectedDur : null)}</td><td>${number(actualWin)}</td><td>${number(expectedWin)}</td><td>${number(win_delta != null ? win_delta : null)}</td><td>${number(threshold)}</td><td>${breach == null ? `${Number(game.breach_pct).toFixed(2)}%` : `${breach.toFixed(2)}%`}</td></tr>`];
-        for (const place of (DATA.bet_places || []).filter(entry => entry.game_type === name)) {
-          rows.push(`<tr>
-            <td>${escapeHtml(place.bet_place)}</td><td>${place.days}</td>
-            <td>${number(place.mean_actual_duration)}</td><td>${number(place.mean_expected_duration)}</td><td>${number(place.mean_duration_delta)}</td>
-            <td>${number(place.mean_actual_wins)}</td><td>${number(place.mean_expected_wins)}</td><td>${number(place.mean_win_delta)}</td><td>${Number(place.breach_pct).toFixed(2)}%</td>
+        const dealerRows = [];
+        /* Show top 5 dealers by mean actual duration for this game */
+        const gameDealers = (DATA.game_dealer_map || {})[name] || {};
+        const dealerEntries = Object.entries(gameDealers)
+          .map(([did, sublist]) => ({
+            dealer_id: did,
+            mean_actual: mean(sublist.map(r => r["actual_duration"])),
+            mean_expected: mean(sublist.map(r => r["expected_duration"])),
+            breach_pct: round(
+              sum(1 for r in sublist if r["actual_duration"] > r["expected_duration"]) / sublist.length * 100, 2
+            ),
+            rows: sublist.length
+          }))
+          .sort((a, b) => b.mean_actual - a.mean_actual)
+          .slice(0, 5);
+
+        dealerRows.push(`<tr class="table-total"><td>${escapeHtml(name)} — top dealers</td>`);
+        dealerEntries.forEach(d => {
+          dealerRows.push(`<tr>
+            <td>${escapeHtml(d.dealer_id)}</td><td>${number(d.mean_actual)}</td>
+            <td>${number(d.mean_expected)}</td><td>${Number(d.breach_pct).toFixed(2)}%</td>
           </tr>`);
-        }
-        document.getElementById(`gameRows-${index}`).innerHTML = rows.join('');
-        const line = (seriesByGame, label, color, dash) => ({
-          name: label, type: 'line', showSymbol: false, smooth: true, connectNulls: false,
-          data: timeframeSeries(seriesByGame, name).map(([day, value]) => [day, value]),
-          itemStyle: { color }, lineStyle: dash ? { width: 2, type: dash } : { width: 2 }
         });
-        gameCharts[index].dur.setOption({
-          ...trendCommon, yAxis: { ...trendCommon.yAxis, name: 'Duration (h)' },
-          series: [ line(DATA.series_duration, 'Actual duration', '#38bdf8'), line(DATA.series_expected_duration, 'Expected duration', '#fbbf24', 'dashed') ]
-        }, true);
-        gameCharts[index].win.setOption({
-          ...trendCommon, yAxis: { ...trendCommon.yAxis, name: 'Wins' },
-          series: [
-            line(DATA.series_actual_wins, 'Actual wins', '#38bdf8'),
-            line(DATA.series_expected_wins, 'Expected wins', '#a78bfa', 'dashed'),
-            line(DATA.series_threshold, 'Threshold', '#fb7185', 'dotted')
-          ]
-        }, true);
+        document.getElementById(`gameRows-${index}`).innerHTML = dealerRows.join('');
       });
     }
 
     function renderRelationship() {
       const latest = DATA.latest_day;
       const rows = latest.rows || [];
-      const groups = [...new Set(rows.filter(row => row.actual_duration != null && row.actual_wins != null).map(row => row.game_type))];
+      const groups = [...new Set(rows.filter(row => row.actual_duration != null).map(row => row.game_type))];
       charts.relationship.setOption({
         color: colors, tooltip: {
           ...tooltipStyle, formatter: point => {
             const row = point.data.row;
-            return `<strong>${escapeHtml(row.game_type)}</strong><br>${escapeHtml(row.bet_place)}<br>Actual duration: ${number(row.actual_duration)}<br>Actual wins: ${number(row.actual_wins)}<br>Threshold: ${number(row.threshold)}<br>${row.shift_breach ? 'Above threshold' : 'At/below threshold'}`;
+            return `<strong>${escapeHtml(row.game_type)}</strong><br>${escapeHtml(row.dealer)}<br>Actual duration: ${number(row.actual_duration)}<br>Expected duration: ${number(row.expected_duration)}<br>${row.actual_duration > row.expected_duration ? 'Above expected' : 'At/below expected'}`;
           }
         },
         legend: { data: groups, textStyle: { color: '#cbd5e1' } },
         grid: { left: 65, right: 24, top: 42, bottom: 48 },
-        xAxis: { type: 'value', name: 'Actual duration (h)', ...axisStyle },
-        yAxis: { type: 'value', name: 'Actual wins', ...axisStyle },
+        xAxis: { type: 'value', name: 'Duration (h)', ...axisStyle },
+        yAxis: { type: 'value', name: 'Duration (h)', ...axisStyle },
         series: groups.map(game => ({
           name: game, type: 'scatter', symbolSize: 11,
-          data: rows.filter(row => row.game_type === game && row.actual_duration != null && row.actual_wins != null).map(row => ({
-            value: [row.actual_duration, row.actual_wins],
-            symbol: row.shift_breach ? 'triangle' : 'circle',
+          data: rows.filter(row => row.game_type === game && row.actual_duration != null).map(row => ({
+            value: [row.actual_duration, row.expected_duration],
+            symbol: row.actual_duration > row.expected_duration ? 'triangle' : 'circle',
             row
           }))
         }))
       }, true);
       document.querySelector('#relationship').previousElementSibling.textContent =
-        `Each point is a bet place on ${latest.billing_date}; triangles indicate duration above threshold`;
+        `Each point is a dealer round on ${latest.billing_date}; triangles indicate above-expected duration`;
     }
 
-    function render() {
-      renderCombinedSummary();
-      renderGameComparisons();
-      renderGameSections();
-      renderRelationship();
+    function renderDealerProgress(dealerId) {
+      const entries = DATA.dealer_entries || {}[dealerId] || [];
+      if (!entries || entries.length === 0) {
+        document.getElementById('dealerProgress').innerHTML = '<div class="alert">No trajectory data for selected dealer.</div>';
+        return;
+      }
+
+      // Filter by date range if active
+      const { start, end } = getDateRange();
+      const filtered = entries.filter(e => {
+        if (!inDateRange(e.date)) return false;
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        document.getElementById('dealerProgress').innerHTML = '<div class="alert">No data in selected date range.</div>';
+        return;
+      }
+
+      // Sort by date
+      filtered.sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.game_type || '').localeCompare(b.game_type || ''));
+
+      // Build series: one line per game type for this dealer
+      const gameTypes = [...new Set(filtered.map(e => e.game_type))];
+      const series = gameTypes.map(gt => ({
+        name: gt,
+        type: 'line',
+        showSymbol: false,
+        smooth: true,
+        connectNulls: false,
+        data: filtered
+          .filter(e => e.game_type === gt)
+          .map(e => [e.date, e.actual_duration])
+          .filter(d => d[1] != null),
+        itemStyle: { color: colors[gameTypes.indexOf(gt) % colors.length] },
+        lineStyle: { width: 2 }
+      }));
+
+      charts.dealerProgress.setOption({
+        ...trendCommon,
+        yAxis: { ...trendCommon.yAxis, name: 'Duration (h)' },
+        tooltip: { ...tooltipStyle, trigger: 'axis' },
+        legend: { textStyle: { color: '#cbd5e1' } },
+        dataZoom: [
+          { type: 'inside' },
+          { type: 'slider', height: 14, bottom: 4, borderColor: '#334155', textStyle: { color: '#94a3b8', fontSize: 8 } }
+        ],
+        series: series
+      });
+    }
+
+    function initDealerSelect() {
+      dealerSelect.addEventListener('change', (e) => {
+        const selected = e.target.value;
+        renderDealerProgress(selected);
+      });
     }
 
     function initDateRangeBounds() {
-      const dates = [...Object.values(DATA.series_duration || {}), ...Object.values(DATA.series_expected_duration || {}),
-                     ...Object.values(DATA.series_actual_wins || {}), ...Object.values(DATA.series_expected_wins || {}),
-                     ...Object.values(DATA.series_threshold || {})].flat().map(([day]) => day).sort();
-      const min = DATA.meta.billing_date_min || dates[0] || '';
-      const max = DATA.meta.billing_date_max || dates[dates.length - 1] || '';
+      const allDates = [...Object.values(DATA.series_duration || {}), ...Object.values(DATA.series_breach || {})].flat().map(([day]) => day).sort();
+      const min = DATA.meta.billing_date_min || (allDates.length > 0 ? allDates[0][0] : '');
+      const max = DATA.meta.billing_date_max || (allDates.length > 0 ? allDates[allDates.length - 1][0] : '');
       const startInput = document.getElementById('startDate');
       const endInput = document.getElementById('endDate');
       for (const input of [startInput, endInput]) {
@@ -389,9 +403,10 @@ def build_dashboard():
       document.getElementById('startDate').value = '';
       document.getElementById('endDate').value = '';
       render();
+      initDealerSelect();
     }
 
-    const allCharts = () => [...Object.values(charts), ...gameCharts.flatMap(entry => [entry.dur, entry.win])];
+    const allCharts = () => [...Object.values(charts), charts.dealerProgress];
 
     renderKpis();
     initDateRangeBounds();
@@ -401,6 +416,7 @@ def build_dashboard():
     document.getElementById('startDate').addEventListener('change', render);
     document.getElementById('endDate').addEventListener('change', render);
     document.getElementById('resetDateRange').addEventListener('click', resetDateRange);
+    dealerSelect.addEventListener('change', render);
     window.addEventListener('resize', () => allCharts().forEach(chart => chart.resize()));
   </script>
 </body>

@@ -48,9 +48,9 @@ Large files (name-only, DO NOT READ):
  │       ├── ... (25 more, 2026-10-06 through 2026-10-07) ...
  │       └── 2026-10-07-17-46-44_EXPORT_CSV_45680_721_0.csv
  │
- |-- scripts/ (pipeline entry point and chart helper)
- |   |-- generate_all_dashboards.py (14-step master wrapper; section 6)
- |   `-- generate_chart.js
+|-- scripts/ (pipeline entry point and chart helper)
+  |   |-- generate_all_dashboards.py (18-step master wrapper; section 6)
+  |   `-- generate_chart.js
  ├── src/                                               (ALL Python data scripts)
  │   ├── ingest/                                        (raw-data ingestion & analysis)
  │   │   ├── advanced_analysis.py                       (LEGACY monolith: all 4 analyses in one process — superseded by the four split scripts below; kept for reference)
@@ -911,6 +911,95 @@ src\ingest\probability_he_ingest.py, pipeline step 13).
    resolving to existing anchors; unique game ids incl. the DT alias pair;
    calendar/stacked-bar series and table totals reconcile with the payload for
    the 90-day window, "all" history, an August start date and reset).
+
+==============================================================================
+   12. RECENT UPDATE (2026-10-13) — STICKY HEADER FILTERS + BREACH CHARTS
+==============================================================================
+
+Follow-up to sections 10-11 on
+output\dashboards\game_probability_dashboard.html (generator:
+src\dashboard\generate_probability_dashboard_html.py; no payload change).
+
+1. FILTERS MOVED INTO THE STICKY HEADER
+   - The .filters container (Trend window #periodFilter, Start date
+     #startDate, End date #endDate, Reset range #resetDateRange) moved out of
+     the hero and inside <header>, where header .filters { flex-basis: 100% }
+     gives it its own separated row between the dashboard links and the
+     quick-nav. The header now stacks: title + BI/Behavior links, time filters,
+     jump links — all pinned while scrolling. The hero keeps only the h2 +
+     intro paragraph. article[id]{scroll-margin-top} raised 140px -> 200px so
+     anchor jumps still clear the taller header.
+   - #periodFilter gained <option value="7">Latest 7 days</option> as the first
+     choice; 90 days remains the default. inTimeframe() already derives the
+     cutoff from Number(days), so 7 works everywhere with no logic change.
+
+2. BREACH TABLES REPLACED WITH ECHARTS
+   - "Number of times threshold exceeded by betting area" -> #breachByPlace:
+     horizontal bar chart (yAxis category, inverse so the largest sits on top)
+     listing all 111 "GAME · bet_place" areas with value labels, an in+slider
+     dataZoom on the yAxis, and a height that scales at 18px per bar capped at
+     1100px (set inline, then resize()). Tooltip shows in-view and full-history
+     counts.
+   - "Number of times threshold exceeded by game type" -> #breachByGame:
+     vertical bar chart sorted descending, per-game colors, top value labels,
+     and an axis tooltip with share of in-view breaches, days in view,
+     breaches/day and full-history totals.
+   - The old .table-wrap tables (#breachByGameRows / #breachByBetPlaceRows)
+     were removed entirely; chartIds now registers breachByGame and
+     breachByPlace (9 static + 16 per-game = 25 instances).
+
+3. LAYOUT REORDER FOR HIGH-PRIORITY METRICS
+   - Top of the main grid: #combinedPanel header, then "Probability vs
+     expected probability and threshold" (#probCompare) — immediately below
+     the global KPIs — then #combinedHe, #combinedProb and #heCompare.
+   - #breachAnalytics follows, its first item now the betting-area chart
+     (#breachByPlace), then the calendar (#breachCalendar), the stacked
+     by-date bars (#breachByDate) and the by-game chart (#breachByGame).
+   - Per-game sections, latest-day scatter and the full-history Game type
+     summary table keep their positions after the breach section.
+
+4. VERIFICATION: node --check; stubbed DOM/ECharts smoke test — 28/28 checks
+   pass (25 chart instances; filters + listeners inside the header; 7-day
+   option present with 90 still default; both breach charts horizontal/vertical
+   as specified, sorted, capped height, slider zoom; chart totals reconcile
+   with daily[].breaches for the 7-day, 90-day, custom-start and reset cases;
+   previous per-game/quick-nav regressions still green).
+
+==============================================================================
+   13. RECENT UPDATE (2026-10-13) — HE TRENDS SPLIT PER GAME
+==============================================================================
+
+Follow-up to section 12 on output\dashboards\game_probability_dashboard.html
+(generator: src\dashboard\generate_probability_dashboard_html.py; no payload
+change). Requested because the pooled HE line chart mixed all games on one
+pair of axes.
+
+1. REMOVED: the combined "Overall HE trend — all games" chart — its article,
+   the 'combinedHe' entry in chartIds and the charts.combinedHe.setOption block
+   inside renderCombinedSummary(). No game-agnostic HE line chart remains; the
+   dashboard no longer plots multiple game types on one HE trend axis.
+
+2. RENAMED: the per-game charts generated by buildGameSections() now read
+   "<GAME> - HE Trend" (e.g. "BACCARAT - HE Trend") and
+   "<GAME> - Probability and threshold trend", so each standalone chart is
+   self-labelling inside its own game section. Series names stay "Actual HE" /
+   "Expected HE" (dashed) and "Actual probability" / "Expected probability" /
+   "Threshold" (dotted). Per-game HE trend charts still follow the global
+   timeframe (trend window ∩ date range) via timeframeSeries().
+
+3. KEPT: heCompare ("Average actual vs expected HE by game") — it is a grouped
+   BAR comparison, not a trend line chart, so it does not overlap lines; it is
+   now .wide to fill the Combined Summary row left open by the removed chart.
+   Combined Summary order: header, probCompare (probability comparison),
+   combinedProb (pooled probability trend), heCompare — followed by Threshold
+   Breach Analytics.
+
+4. VERIFICATION: node --check; stubbed DOM/ECharts smoke test — 23/23 checks
+   pass (24 chart instances: 8 static + 16 per-game; combinedHe never
+   initialised and no setOption sent to it; every game section contains its own
+   labelled "<GAME> - HE Trend" chart with exactly 2 series plotting only that
+   game's series; 90-day / "all" / start-date / reset cases all re-filter the
+   per-game HE charts; breach and quick-nav regressions still green).
 
 ==============================================================================
 EOF

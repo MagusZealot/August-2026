@@ -70,7 +70,8 @@ def build_dashboard():
     .game-sections { display: contents; }
     .grid.nested { margin-top: 12px; }
     .chart.tall { height: 430px; }
-    article[id] { scroll-margin-top: 140px; }
+    article[id] { scroll-margin-top: 200px; }
+    header .filters { flex-basis: 100%; align-items: center; margin-top: 10px; padding-top: 8px; border-top: 1px solid #253247; }
     .quick-nav { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 12px; padding-top: 10px; border-top: 1px solid #253247; }
     .quick-nav .quick-nav-label { color: #77869c; font-size: 10px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; margin-right: 2px; }
     .quick-nav a { padding: 5px 10px; border: 1px solid #2b3b57; border-radius: 7px; background: #0f1a2e; color: #9fb2ca; text-decoration: none; font-size: 11px; font-weight: 600; white-space: nowrap; }
@@ -96,6 +97,12 @@ def build_dashboard():
       <a href="bi_dashboard.html"><i class="fa-solid fa-chart-line"></i> BI Console</a>
       <a href="player_behavior_dashboard.html"><i class="fa-solid fa-gamepad"></i> Player Behavior</a>
     </nav>
+    <div class="filters">
+      <label class="muted" for="periodFilter">Trend window<br><select id="periodFilter"><option value="7">Latest 7 days</option><option value="90">Latest 90 days</option><option value="365">Latest 365 days</option><option value="all">All available dates</option></select></label>
+      <label class="muted" for="startDate">Start date<br><input type="date" id="startDate"></label>
+      <label class="muted" for="endDate">End date<br><input type="date" id="endDate"></label>
+      <button type="button" class="date-range-reset" id="resetDateRange" title="Clear the date range and fall back to the trend window"><i class="fa-solid fa-rotate-left"></i> Reset range</button>
+    </div>
     <nav class="quick-nav" id="quickNav" aria-label="Quick navigation"></nav>
   </header>
   <main>
@@ -103,12 +110,6 @@ def build_dashboard():
       <div>
         <h2>Every game at a glance: combined trends and per-game detail</h2>
         <p>Percent values follow the source feed. Probability breaches are actual probability above threshold.</p>
-      </div>
-      <div class="filters">
-        <label class="muted" for="periodFilter">Trend window<br><select id="periodFilter"><option value="90">Latest 90 days</option><option value="365">Latest 365 days</option><option value="all">All available dates</option></select></label>
-        <label class="muted" for="startDate">Start date<br><input type="date" id="startDate"></label>
-        <label class="muted" for="endDate">End date<br><input type="date" id="endDate"></label>
-        <button type="button" class="date-range-reset" id="resetDateRange" title="Clear the date range and fall back to the trend window"><i class="fa-solid fa-rotate-left"></i> Reset range</button>
       </div>
     </section>
     <div id="coverageAlert"></div>
@@ -118,20 +119,19 @@ def build_dashboard():
         <h3>Combined Summary — all games</h3>
         <div class="muted" id="combinedNote">Pooled daily means across every game type · follows the trend window and date range</div>
       </article>
-      <article class="card chart-card"><h3>Overall HE trend — all games</h3><div class="muted">Pooled daily mean actual vs expected house edge</div><div id="combinedHe" class="chart"></div></article>
+      <article class="card chart-card"><h3>Probability vs expected probability and threshold</h3><div class="muted" id="probCompareNote">Compare the observed probability with the model and configured limit</div><div id="probCompare" class="chart"></div></article>
       <article class="card chart-card"><h3>Overall probability and threshold trend — all games</h3><div class="muted">Pooled daily mean actual vs expected probability and threshold</div><div id="combinedProb" class="chart"></div></article>
+      <article class="card chart-card wide"><h3>Average actual vs expected HE by game</h3><div class="muted" id="heCompareNote">Daily bet-place records pooled across the selected history</div><div id="heCompare" class="chart"></div></article>
       <article class="card chart-card wide" id="breachAnalytics">
         <h3>Threshold Breach Analytics</h3>
         <div class="muted" id="breachNote">Rows where actual probability exceeds the configured threshold · follows the trend window and date range</div>
         <div class="grid nested">
+          <article class="card chart-card wide"><h3>Number of times threshold exceeded by betting area</h3><div class="muted">Every betting area ranked by breaches in view · drag the axis slider to scroll the full list</div><div id="breachByPlace" class="chart"></div></article>
           <article class="card chart-card"><h3>Breach frequency calendar</h3><div class="muted">Daily count of threshold breaches across all games</div><div id="breachCalendar" class="chart tall"></div></article>
           <article class="card chart-card"><h3>Number of times threshold exceeded by billing date</h3><div class="muted">Stacked daily breach counts by game type</div><div id="breachByDate" class="chart"></div></article>
-          <article class="card chart-card wide"><h3>Number of times threshold exceeded by game type</h3><div class="table-wrap"><table><thead><tr><th>Game</th><th>Breaches in view</th><th>Share of breaches in view</th><th>Days in view</th><th>Breaches per day in view</th><th>Breaches full history</th><th>Breach % full history</th></tr></thead><tbody id="breachByGameRows"></tbody></table></div></article>
-          <article class="card chart-card wide"><h3>Number of times threshold exceeded by betting area</h3><div class="table-wrap"><table><thead><tr><th>Game</th><th>Betting area</th><th>Breaches in view</th><th>Breaches full history</th><th>Breach % full history</th></tr></thead><tbody id="breachByBetPlaceRows"></tbody></table></div></article>
+          <article class="card chart-card wide"><h3>Number of times threshold exceeded by game type</h3><div class="muted">Breaches in view per game, with full-history totals in the tooltip</div><div id="breachByGame" class="chart"></div></article>
         </div>
       </article>
-      <article class="card chart-card"><h3>Average actual vs expected HE by game</h3><div class="muted" id="heCompareNote">Daily bet-place records pooled across the selected history</div><div id="heCompare" class="chart"></div></article>
-      <article class="card chart-card"><h3>Probability vs expected probability and threshold</h3><div class="muted" id="probCompareNote">Compare the observed probability with the model and configured limit</div><div id="probCompare" class="chart"></div></article>
       <div class="game-sections" id="gameSections"></div>
       <article class="card chart-card wide"><h3>Latest bet-place relationship: actual probability vs actual HE</h3><div class="muted">Each point is a bet place on the latest billing date; triangles indicate probability above threshold</div><div id="relationship" class="chart"></div></article>
       <article class="card chart-card wide" id="gameSummary"><h3>Game type summary</h3><div class="table-wrap"><table><thead><tr><th>Game</th><th>Days</th><th>HE rows</th><th>Actual HE</th><th>Expected HE</th><th>HE delta</th><th>Actual prob.</th><th>Expected prob.</th><th>Threshold</th><th>Breach rows %</th></tr></thead><tbody id="summaryRows"></tbody></table></div></article>
@@ -142,7 +142,7 @@ def build_dashboard():
   <script>
     const DATA = JSON.parse(document.getElementById('probability-data').textContent);
     const colors = ['#38bdf8','#34d399','#fbbf24','#c084fc','#fb7185','#2dd4bf','#a3e635','#f97316'];
-    const chartIds = ['heCompare','probCompare','combinedHe','combinedProb','breachCalendar','breachByDate','relationship'];
+    const chartIds = ['heCompare','probCompare','combinedProb','breachCalendar','breachByDate','breachByGame','breachByPlace','relationship'];
     const charts = Object.fromEntries(chartIds.map(id => [id, echarts.init(document.getElementById(id))]));
     const gameCharts = [];
     const number = value => value == null ? '—' : `${Number(value).toFixed(2)}%`;
@@ -278,13 +278,6 @@ def build_dashboard():
       const suffix = (start || end) ? ` · ${start || '…'} to ${end || '…'}` : '';
       document.getElementById('combinedNote').textContent =
         `${types.length} game types · ${(DATA.bet_places || []).length} bet places · ${Number(totalRows).toLocaleString()} pooled rows · pooled breach rate ${pooledBreach == null ? '—' : `${pooledBreach.toFixed(2)}%`} · ${rows.length} days in view${suffix}`;
-      charts.combinedHe.setOption({
-        ...trendCommon, yAxis: { ...trendCommon.yAxis, name: 'HE (%)' },
-        series: [
-          { name: 'Actual HE', type: 'line', showSymbol: false, smooth: true, connectNulls: false, data: rows.map(row => [row.date, row.mean_actual_he]), lineStyle: { width: 2 }, itemStyle: { color: '#38bdf8' } },
-          { name: 'Expected HE', type: 'line', showSymbol: false, smooth: true, connectNulls: false, data: rows.map(row => [row.date, row.mean_expected_he]), lineStyle: { width: 2, type: 'dashed' }, itemStyle: { color: '#fbbf24' } }
-        ]
-      }, true);
       charts.combinedProb.setOption({
         ...trendCommon, yAxis: { ...trendCommon.yAxis, name: 'Probability (%)' },
         series: [
@@ -311,8 +304,8 @@ def build_dashboard():
             <tbody id="gameRows-${index}"></tbody>
           </table></div>
           <div class="grid nested">
-            <article class="card chart-card"><h3>HE trend — ${escapeHtml(game.game_type)}</h3><div class="muted">Daily actual and expected house edge · honours the trend window and date range</div><div id="gameHe-${index}" class="chart"></div></article>
-            <article class="card chart-card"><h3>Probability and threshold trend — ${escapeHtml(game.game_type)}</h3><div class="muted">Daily average probability and threshold · honours the trend window and date range</div><div id="gameProb-${index}" class="chart"></div></article>
+            <article class="card chart-card"><h3>${escapeHtml(game.game_type)} - HE Trend</h3><div class="muted">Daily actual vs expected house edge · honours the trend window and date range</div><div id="gameHe-${index}" class="chart"></div></article>
+            <article class="card chart-card"><h3>${escapeHtml(game.game_type)} - Probability and threshold trend</h3><div class="muted">Daily average probability and threshold · honours the trend window and date range</div><div id="gameProb-${index}" class="chart"></div></article>
           </div>`;
         fragment.appendChild(article);
       });
@@ -395,32 +388,67 @@ def build_dashboard():
         daysInView: timeframeSeries(DATA.series_breach_count, game.game_type).length
       }));
       const breachesInView = perGame.reduce((sum, entry) => sum + entry.inView, 0);
-      document.getElementById('breachByGameRows').innerHTML = perGame
-        .sort((a, b) => b.inView - a.inView || a.game.game_type.localeCompare(b.game.game_type))
-        .map(entry => `<tr>
-          <td>${escapeHtml(entry.game.game_type)}</td>
-          <td>${entry.inView.toLocaleString()}</td>
-          <td>${breachesInView ? `${(entry.inView / breachesInView * 100).toFixed(2)}%` : '—'}</td>
-          <td>${entry.daysInView}</td>
-          <td>${entry.daysInView ? (entry.inView / entry.daysInView).toFixed(2) : '—'}</td>
-          <td>${Number(entry.game.breaches).toLocaleString()}</td>
-          <td>${Number(entry.game.breach_pct).toFixed(2)}%</td>
-        </tr>`).join('');
+      const byGame = perGame
+        .slice()
+        .sort((a, b) => b.inView - a.inView || a.game.game_type.localeCompare(b.game.game_type));
+      charts.breachByGame.setOption({
+        color: colors, tooltip: {
+          ...tooltipStyle, trigger: 'axis', axisPointer: { type: 'shadow' },
+          formatter: params => {
+            const entry = byGame[params[0].dataIndex];
+            return `<strong>${escapeHtml(entry.game.game_type)}</strong><br>Breaches in view: ${entry.inView.toLocaleString()}<br>Share of breaches in view: ${breachesInView ? `${(entry.inView / breachesInView * 100).toFixed(2)}%` : '—'}<br>Days in view: ${entry.daysInView} · per day: ${entry.daysInView ? (entry.inView / entry.daysInView).toFixed(2) : '—'}<br>Full history: ${Number(entry.game.breaches).toLocaleString()} (${Number(entry.game.breach_pct).toFixed(2)}%)`;
+          }
+        },
+        grid: { left: 52, right: 18, top: 38, bottom: 62 },
+        xAxis: { type: 'category', data: byGame.map(entry => entry.game.game_type), axisLabel: { ...axisStyle.axisLabel, rotate: 25 } },
+        yAxis: { type: 'value', name: 'Breaches', ...axisStyle },
+        series: [{
+          name: 'Breaches in view', type: 'bar', barMaxWidth: 44,
+          data: byGame.map((entry, index) => ({
+            value: entry.inView,
+            itemStyle: { color: colors[index % colors.length], borderRadius: [4, 4, 0, 0] }
+          })),
+          label: { show: true, position: 'top', color: '#cbd5e1', fontSize: 10 }
+        }]
+      }, true);
 
       const placeCounts = {};
       for (const [key, series] of Object.entries(DATA.bet_place_breaches || {})) {
         placeCounts[key] = series.filter(([day]) => inTimeframe(day)).reduce((sum, [, value]) => sum + value, 0);
       }
-      document.getElementById('breachByBetPlaceRows').innerHTML = (DATA.bet_places || [])
+      const byPlace = (DATA.bet_places || [])
         .map(place => ({ place, inView: placeCounts[place.key] || 0 }))
-        .sort((a, b) => b.inView - a.inView || b.place.breaches - a.place.breaches || a.place.key.localeCompare(b.place.key))
-        .map(entry => `<tr>
-          <td>${escapeHtml(entry.place.game_type)}</td>
-          <td>${escapeHtml(entry.place.bet_place)}</td>
-          <td>${entry.inView.toLocaleString()}</td>
-          <td>${Number(entry.place.breaches).toLocaleString()}</td>
-          <td>${Number(entry.place.breach_pct).toFixed(2)}%</td>
-        </tr>`).join('');
+        .sort((a, b) => b.inView - a.inView || b.place.breaches - a.place.breaches || a.place.key.localeCompare(b.place.key));
+      const placeChart = document.getElementById('breachByPlace');
+      const desiredHeight = Math.min(1100, Math.max(350, byPlace.length * 18 + 90));
+      if (placeChart.style.height !== `${desiredHeight}px`) placeChart.style.height = `${desiredHeight}px`;
+      charts.breachByPlace.setOption({
+        tooltip: {
+          ...tooltipStyle,
+          formatter: point => {
+            const entry = byPlace[point.dataIndex];
+            return `<strong>${escapeHtml(entry.place.game_type)} · ${escapeHtml(entry.place.bet_place)}</strong><br>Breaches in view: ${entry.inView.toLocaleString()}<br>Full history: ${Number(entry.place.breaches).toLocaleString()} (${Number(entry.place.breach_pct).toFixed(2)}%)`;
+          }
+        },
+        grid: { left: 175, right: 42, top: 30, bottom: 30 },
+        xAxis: { type: 'value', name: 'Breaches', ...axisStyle },
+        yAxis: {
+          type: 'category', inverse: true,
+          data: byPlace.map(entry => `${entry.place.game_type} · ${entry.place.bet_place}`),
+          axisLabel: { ...axisStyle.axisLabel, fontSize: 10 }
+        },
+        dataZoom: [
+          { type: 'inside', yAxisIndex: 0 },
+          { type: 'slider', yAxisIndex: 0, width: 12, right: 10, top: 30, bottom: 30, borderColor: '#334155', backgroundColor: '#121d30', fillerColor: '#1e3a5f', dataBackground: { lineStyle: { color: '#334155' }, areaStyle: { color: '#1e3a5f' } }, textStyle: { color: '#94a3b8', fontSize: 8 } }
+        ],
+        series: [{
+          name: 'Breaches in view', type: 'bar', barMaxWidth: 14,
+          data: byPlace.map(entry => entry.inView),
+          itemStyle: { color: '#38bdf8', borderRadius: [0, 3, 3, 0] },
+          label: { show: true, position: 'right', color: '#94a3b8', fontSize: 9 }
+        }]
+      }, true);
+      charts.breachByPlace.resize();
     }
 
     function renderGameSections() {
