@@ -11,7 +11,7 @@
 py scripts/generate_all_dashboards.py
 
 # Output: Three interactive dashboards in output/dashboards/
-# - bi_dashboard.html           (Main BI & Risk Intelligence Console)
+# - bi_dashboard.html               (Main BI & Risk Intelligence Console)
 # - player_behavior_dashboard.html  (Player Behavioral Intelligence Console)
 # - game_probability_dashboard.html (Probability & HE Console)
 ```
