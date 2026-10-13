@@ -100,8 +100,8 @@ def build_dashboard():
     <div id="coverageAlert"></div>
     <section id="kpis" class="kpis"></section>
     <section class="grid">
-      <article class="card chart-card"><h3>Average actual vs expected HE by game</h3><div class="muted">Daily bet-place records pooled across the selected history</div><div id="heCompare" class="chart"></div></article>
-      <article class="card chart-card"><h3>Probability vs expected probability and threshold</h3><div class="muted">Compare the observed probability with the model and configured limit</div><div id="probCompare" class="chart"></div></article>
+      <article class="card chart-card"><h3>Average actual vs expected HE by game</h3><div class="muted" id="heCompareNote">Daily bet-place records pooled across the selected history</div><div id="heCompare" class="chart"></div></article>
+      <article class="card chart-card"><h3>Probability vs expected probability and threshold</h3><div class="muted" id="probCompareNote">Compare the observed probability with the model and configured limit</div><div id="probCompare" class="chart"></div></article>
       <article class="card chart-card wide" id="trendPanel">
         <div class="trend-tabs" role="tablist" aria-label="Trend views">
           <button type="button" class="trend-tab-btn active" role="tab" aria-selected="true" aria-controls="pane-heTrend" onclick="switchTrendTab('he')"><i class="fa-solid fa-chart-line"></i> HE trend for selected game</button>
@@ -164,6 +164,23 @@ def build_dashboard():
       </tr>`).join('');
     }
 
+    function comparisonValues(seriesKey, meanKey) {
+      const { start, end } = getDateRange();
+      const precomputed = () => types.map(game => game[meanKey]);
+      if (!start && !end) return precomputed();
+      return types.map(game => {
+        const values = pair(DATA[seriesKey], game.game_type).filter(([day]) => inDateRange(day)).map(([, value]) => value).filter(value => value != null);
+        return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+      });
+    }
+
+    function updateComparisonNotes() {
+      const { start, end } = getDateRange();
+      const suffix = (start || end) ? ` · ${start || '…'} to ${end || '…'}` : '';
+      document.getElementById('heCompareNote').textContent = `Daily bet-place records pooled across the selected history${suffix}`;
+      document.getElementById('probCompareNote').textContent = `Compare the observed probability with the model and configured limit${suffix}`;
+    }
+
     function renderGameComparisons() {
       const names = types.map(game => game.game_type);
       charts.heCompare.setOption({
@@ -171,8 +188,8 @@ def build_dashboard():
         grid: { left: 55, right: 18, top: 38, bottom: 72 },
         xAxis: { type: 'category', data: names, axisLabel: { ...axisStyle.axisLabel, rotate: 25 } }, yAxis: { type: 'value', name: 'HE (%)', ...axisStyle },
         series: [
-          { name: 'Actual HE', type: 'bar', data: types.map(game => game.mean_actual_he), itemStyle: { borderRadius: [4,4,0,0] } },
-          { name: 'Expected HE', type: 'bar', data: types.map(game => game.mean_expected_he), itemStyle: { borderRadius: [4,4,0,0] } }
+          { name: 'Actual HE', type: 'bar', data: comparisonValues('series_he', 'mean_actual_he'), itemStyle: { borderRadius: [4,4,0,0] } },
+          { name: 'Expected HE', type: 'bar', data: comparisonValues('series_expected_he', 'mean_expected_he'), itemStyle: { borderRadius: [4,4,0,0] } }
         ]
       });
       charts.probCompare.setOption({
@@ -180,11 +197,12 @@ def build_dashboard():
         grid: { left: 55, right: 18, top: 38, bottom: 72 },
         xAxis: { type: 'category', data: names, axisLabel: { ...axisStyle.axisLabel, rotate: 25 } }, yAxis: { type: 'value', name: 'Probability (%)', ...axisStyle },
         series: [
-          { name: 'Actual probability', type: 'bar', data: types.map(game => game.mean_actual_probability), itemStyle: { borderRadius: [4,4,0,0] } },
-          { name: 'Expected probability', type: 'bar', data: types.map(game => game.mean_expected_probability), itemStyle: { borderRadius: [4,4,0,0] } },
-          { name: 'Threshold', type: 'bar', data: types.map(game => game.mean_threshold), itemStyle: { borderRadius: [4,4,0,0] } }
+          { name: 'Actual probability', type: 'bar', data: comparisonValues('series_actual_probability', 'mean_actual_probability'), itemStyle: { borderRadius: [4,4,0,0] } },
+          { name: 'Expected probability', type: 'bar', data: comparisonValues('series_expected_probability', 'mean_expected_probability'), itemStyle: { borderRadius: [4,4,0,0] } },
+          { name: 'Threshold', type: 'bar', data: comparisonValues('series_threshold', 'mean_threshold'), itemStyle: { borderRadius: [4,4,0,0] } }
         ]
       });
+      updateComparisonNotes();
     }
 
     function selectedTrendValues(seriesByGame, selected, days) {
@@ -276,7 +294,7 @@ def build_dashboard():
     function resetDateRange() {
       document.getElementById('startDate').value = '';
       document.getElementById('endDate').value = '';
-      renderTrends();
+      render();
     }
 
     function renderRelationship() {
@@ -319,8 +337,8 @@ def build_dashboard():
     render();
     gameFilter.addEventListener('change', render);
     document.getElementById('periodFilter').addEventListener('change', renderTrends);
-    document.getElementById('startDate').addEventListener('change', renderTrends);
-    document.getElementById('endDate').addEventListener('change', renderTrends);
+    document.getElementById('startDate').addEventListener('change', render);
+    document.getElementById('endDate').addEventListener('change', render);
     document.getElementById('resetDateRange').addEventListener('click', resetDateRange);
     window.addEventListener('resize', () => Object.values(charts).forEach(chart => chart.resize()));
   </script>

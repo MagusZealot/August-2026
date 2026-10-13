@@ -321,12 +321,16 @@ B. DASHBOARD DATA PREPARATION  (src/dashboard/ — read output/, write output/)
        .trend-pane classes that mimic the bi_dashboard.html .tab-pane +
        .nav-tab.active pattern; switchTrendTab() toggles panes, updates
        aria-selected and resizes the revealed chart. A Start Date / End Date
-       input pair sits alongside the existing game/period filters; the range
-       is applied by getDateRange()/inDateRange() inside selectedTrendValues()
-       so both trend tabs filter live (Reset button clears the range and falls
-       back to the trend window). Inputs are bounded by
-       meta.billing_date_min / meta.billing_date_max via
-       initDateRangeBounds(). See section 9.
+       input pair sits alongside the existing game/period filters; the range is
+       applied by getDateRange()/inDateRange() inside selectedTrendValues() so
+       both trend tabs filter live, and by comparisonValues() so the two
+       cross-game comparison charts (heCompare, probCompare) re-average the
+       pooled daily values over the selected days — with the precomputed
+       game_types[].mean_* values used verbatim when no range is active. A
+       Reset button clears the range and falls back to the full payload.
+       Inputs are bounded by meta.billing_date_min / meta.billing_date_max via
+       initDateRangeBounds(). The Game type summary table stays full-history.
+       See section 9.
        Output: output\game_probability_dashboard.html.
        Skip-guard: skipped when the HTML is newer than its JSON payload and
        generator; step 13 always refreshes the source data before this check.
@@ -764,19 +768,33 @@ threshold, Latest bet-place relationship) are unchanged.
    - getDateRange() reads the two inputs; inDateRange(day) tests each ISO date
      string (series day values and input values are both YYYY-MM-DD, so plain
      string comparison is correct).
-   - selectedTrendValues() now applies the date range in addition to the
-     existing period-window cutoff, so BOTH trend tabs filter live on 'change'
-     of either date input. Empty inputs mean "no bound" on that side.
-   - resetDateRange() clears both inputs and re-renders the trends.
+   - selectedTrendValues() applies the date range in addition to the existing
+     period-window cutoff, so BOTH trend tabs filter live on 'change' of either
+     date input. Empty inputs mean "no bound" on that side.
+   - The date range ALSO drives the two cross-game comparison charts:
+     "Average actual vs expected HE by game" (heCompare) and "Probability vs
+     expected probability and threshold" (probCompare). comparisonValues()
+     re-averages DATA.series_he / series_expected_he /
+     series_actual_probability / series_expected_probability / series_threshold
+     per game over the filtered days. When NO range is set it returns the
+     payload's precomputed game_types[].mean_* values verbatim, so the default
+     (unfiltered) view is byte-identical to before this change. Each card's
+     #heCompareNote / #probCompareNote caption appends "· start to end" while a
+     range is active.
+   - The Game type summary table keeps the precomputed full-history means and
+     is intentionally NOT range-filtered.
+   - resetDateRange() clears both inputs and re-renders everything.
 
 3. VERIFICATION
    - JS syntax validated (node --check).
-   - Functional smoke test with a stubbed DOM/ECharts: 24/24 checks pass —
+   - Functional smoke test with a stubbed DOM/ECharts: 36/36 checks pass —
      all 5 ECharts instances still initialise, default tab state is correct,
      tab switching toggles panes/buttons/aria and resizes the target chart,
-     date bounds come from meta, date range filters the series (single-day
-     and start-only cases), reset clears inputs and re-renders, and
-     renderTrends() runs without error.
+     date bounds come from meta, date range filters the trend series
+     (single-day and start-only cases), the Comparison charts reproduce the
+     precomputed means when no range is set and re-average the filtered series
+     when one is (with live caption updates), reset restores the precomputed
+     values, and renderTrends()/render() run without error.
 
 Note: the generator writes output/game_probability_dashboard.html; the copy in
 output/dashboards/ is the sibling-linked console that users open (its nav links
