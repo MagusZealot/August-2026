@@ -2990,8 +2990,8 @@ const topCountry = countryDist[0];
 </body>
 </html>'''
 
-out_path_1 = Path(r"C:\Users\IT-40126\Documents\August 2026-20261008T011759Z-1-001\August 2026\output\bi_dashboard.html")
-out_path_2 = Path(r"C:\Users\IT-40126\Documents\August 2026-20261008T011759Z-1-001\August 2026\output\bi_dashboard.html")
+out_path_1 = Path(r"C:\Users\IT-40126\Documents\August 2026-20261008T011759Z-1-001\August 2026\output\dashboards\bi_dashboard.html")
+out_path_2 = Path(r"C:\Users\IT-40126\Documents\August 2026-20261008T011759Z-1-001\August 2026\output\dashboards\bi_dashboard.html")
 
 with open(out_path_1, "w", encoding="utf-8") as f:
     f.write(html_template)

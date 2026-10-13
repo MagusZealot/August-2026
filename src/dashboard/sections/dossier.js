@@ -4,8 +4,8 @@
     // The embedded #dossier-raw-data payload carries the compact index of
     // EVERY player in the audit (meta + players[]) plus the fully detailed
     // operator dossiers. Each player's FULL round-by-round balance trajectory
-    // is lazy-loaded on demand from dossier_chunks/chunk_NNNN.js companion
-    // files sitting next to this HTML, so any of the ~50k players can be
+// is lazy-loaded on demand from ../dossier_chunks/chunk_NNNN.js companion
+// files sitting at ../dossier_chunks/ relative to this HTML, so any of the ~50k players can be
     // opened with their complete balance history without inflating the page.
     let DOSSIER = null;
     let CHUNK_SIZE = 1000;
@@ -105,7 +105,7 @@ function renderArchetypeLegend() {
       if (_chunkCallbacks[chunkId]) { _chunkCallbacks[chunkId].push(callback); return; }
       _chunkCallbacks[chunkId] = [callback];
       const s = document.createElement('script');
-      s.src = 'dossier_chunks/chunk_' + String(chunkId).padStart(4, '0') + '.js';
+      s.src = '../dossier_chunks/chunk_' + String(chunkId).padStart(4, '0') + '.js';
       s.onload = function () {
         const cbs = _chunkCallbacks[chunkId] || [];
         delete _chunkCallbacks[chunkId];
@@ -302,7 +302,7 @@ function renderArchetypeLegend() {
         if (loading) loading.classList.add('hidden');
         if (!chunk) {
           const rrDom2 = document.getElementById('dossierRecentRoundsTable');
-          if (rrDom2) rrDom2.innerHTML = '<p class="text-xs text-rose-400 italic">Trajectory chunk could not be loaded. Make sure the dossier_chunks/ directory sits next to this HTML file (or serve this folder over HTTP, e.g. `python -m http.server`).</p>';
+          if (rrDom2) rrDom2.innerHTML = '<p class="text-xs text-rose-400 italic">Trajectory chunk could not be loaded. Serve this folder over HTTP (e.g. `python -m http.server`) or ensure dossier_chunks/ is at ../dossier_chunks/ relative to the HTML.</p>';
           return;
         }
         const detail = chunk[p.pid];

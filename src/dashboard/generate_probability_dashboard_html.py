@@ -6,7 +6,7 @@ from pathlib import Path
 
 WORKSPACE = Path(r"C:\Users\IT-40126\Documents\August 2026-20261008T011759Z-1-001\August 2026")
 DATA_FILE = WORKSPACE / "output" / "game_probability_he_data.json"
-OUT_FILE = WORKSPACE / "output" / "game_probability_dashboard.html"
+OUT_FILE = WORKSPACE / "output" / "dashboards" / "game_probability_dashboard.html"
 
 
 def build_dashboard():
@@ -231,7 +231,11 @@ def build_dashboard():
       const common = {
         tooltip: { ...tooltipStyle, trigger: 'axis' }, legend: { type: 'scroll', textStyle: { color: '#cbd5e1' } },
         grid: { left: 58, right: 20, top: 45, bottom: 38 },
-        xAxis: { type: 'time', ...axisStyle }, yAxis: { type: 'value', ...axisStyle }
+        xAxis: { type: 'time', ...axisStyle }, yAxis: { type: 'value', ...axisStyle },
+        dataZoom: [
+          { type: 'inside' },
+          { type: 'slider', height: 14, bottom: 4, borderColor: '#334155', textStyle: { color: '#94a3b8', fontSize: 8 } }
+        ]
       };
       charts.heTrend.setOption({
         ...common, yAxis: { ...common.yAxis, name: 'HE (%)' },
@@ -248,6 +252,8 @@ def build_dashboard():
           ...selectedTrendValues(DATA.series_threshold, selected, days).map(series => ({ ...series, name: `${series.name} threshold`, lineStyle: { ...series.lineStyle, type: 'dotted' } }))
         ]
       }, true);
+      charts.heTrend.resize();
+      charts.probTrend.resize();
     }
 
     function switchTrendTab(which) {

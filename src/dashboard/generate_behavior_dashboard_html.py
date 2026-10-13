@@ -1,9 +1,10 @@
 import json
 from pathlib import Path
 
-REPORT_DIR = Path(r"C:\Users\IT-40126\Documents\August 2026-20261008T011759Z-1-001\August 2026\output")
+REPORT_DIR = Path(r"C:\Users\IT-40126\Documents\August 2026-20261008T011759Z-1-001\August 2026\output\dashboards")
+DATA_DIR = Path(r"C:\Users\IT-40126\Documents\August 2026-20261008T011759Z-1-001\August 2026\output")
 FOLDER = REPORT_DIR.parent
-DATA_FILE = REPORT_DIR / "player_behavior_data.json"
+DATA_FILE = DATA_DIR / "player_behavior_data.json"
 
 def build_dashboard():
     if not DATA_FILE.exists():

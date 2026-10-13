@@ -7,8 +7,8 @@ player_behavior_dashboard.html.
 
 Tab 6 now covers EVERY player in the database (all_players_index.json),
 not just the sampled whales & chasers. Each player's FULL balance
-trajectory is lazy-loaded on demand from dossier_chunks/chunk_NNNN.js
-(companion files sitting next to the HTML), so the dashboard can open
+trajectory is lazy-loaded on demand from ../dossier_chunks/chunk_NNNN.js
+(companion files sitting at ../dossier_chunks/ relative to the HTML), so the dashboard can open
 any of the ~50k players with their complete round-by-round balance
 history.
 """
@@ -16,10 +16,11 @@ history.
 import json
 from pathlib import Path
 
-REPORT_DIR = Path(r"C:\Users\IT-40126\Documents\August 2026-20261008T011759Z-1-001\August 2026\output")
+REPORT_DIR = Path(r"C:\Users\IT-40126\Documents\August 2026-20261008T011759Z-1-001\August 2026\output\dashboards")
+DATA_DIR = Path(r"C:\Users\IT-40126\Documents\August 2026-20261008T011759Z-1-001\August 2026\output")
 FOLDER = REPORT_DIR.parent
-INDEX_FILE = REPORT_DIR / "all_players_index.json"
-DOSSIER_FILE = REPORT_DIR / "individual_dossiers_data.json"   # operators
+INDEX_FILE = DATA_DIR / "all_players_index.json"
+DOSSIER_FILE = DATA_DIR / "individual_dossiers_data.json"
 SRC_HTML = REPORT_DIR / "player_behavior_dashboard.html"
 
 
@@ -418,7 +419,7 @@ def build():
       if (_chunkCallbacks[chunkId]) { _chunkCallbacks[chunkId].push(callback); return; }
       _chunkCallbacks[chunkId] = [callback];
       const s = document.createElement('script');
-      s.src = 'dossier_chunks/chunk_' + String(chunkId).padStart(4, '0') + '.js';
+      s.src = '../dossier_chunks/chunk_' + String(chunkId).padStart(4, '0') + '.js';
       s.onload = function () {
         const cbs = _chunkCallbacks[chunkId] || [];
         delete _chunkCallbacks[chunkId];
@@ -607,7 +608,7 @@ def build():
         if (loading) loading.classList.add('hidden');
         if (!chunk) {
           const rrDom2 = document.getElementById('dossierRecentRoundsTable');
-          if (rrDom2) rrDom2.innerHTML = '<p class="text-xs text-rose-400 italic">Trajectory chunk could not be loaded. Serve this folder over HTTP (e.g. `python -m http.server`) or open the HTML alongside the dossier_chunks/ directory.</p>';
+          if (rrDom2) rrDom2.innerHTML = '<p class="text-xs text-rose-400 italic">Trajectory chunk could not be loaded. Serve this folder over HTTP (e.g. `python -m http.server`) or ensure dossier_chunks/ is at ../dossier_chunks/ relative to the HTML.</p>';
           return;
         }
         const detail = chunk[p.pid];

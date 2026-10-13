@@ -43,6 +43,25 @@ Each snapshot is under 100 KB.
 
 ---
 
+## Data Flow Overview
+
+```mermaid
+flowchart TD
+    RAW[("raw/<br/>27 CSV exports · ~9.5 GB<br/>300-377 MB each")]
+    PROB[("probability/<br/>daily HE snapshots<br/>2025-01-31 → present")]
+
+    RAW --> PIPE["14-step pipeline<br/>py scripts/generate_all_dashboards.py"]
+    PROB --> PIPE
+
+    PIPE --> REPORTS[/"output/reports/<br/>whale · chaser · operator<br/>heatmap · time-series CSVs"/]
+    PIPE --> DATA[/"output/data/<br/>player indexes · behavior<br/>dossier payloads"/]
+    PIPE --> CHUNKS[/"output/chunks/<br/>trajectory chunks · ~180 MB"/]
+    PIPE --> DASH[/"output/dashboards/<br/>bi_dashboard.html<br/>player_behavior_dashboard.html<br/>game_probability_dashboard.html"/]
+    PIPE --> PROGRESS[/"output/progress/<br/>progress.json (live status)"/]
+```
+
+---
+
 ## Pipeline Usage
 
 Run the full pipeline to process these files:

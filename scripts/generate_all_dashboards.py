@@ -239,7 +239,7 @@ def should_skip_prepare_dashboard():
 
 
 def should_skip_main_dashboard():
-    output_dir = WORKSPACE / "output"
+    output_dir = WORKSPACE / "output" / "dashboards"
     out_file = output_dir / "bi_dashboard.html"
     if not out_file.exists() or out_file.stat().st_size == 0:
         return False
@@ -265,7 +265,7 @@ def should_skip_main_dashboard():
 
 
 def should_skip_behavior_dashboard():
-    output_dir = WORKSPACE / "output"
+    output_dir = WORKSPACE / "output" / "dashboards"
     out_file = output_dir / "player_behavior_dashboard.html"
     if not out_file.exists() or out_file.stat().st_size == 0:
         return False
@@ -281,7 +281,8 @@ def should_skip_behavior_dashboard():
 
 def should_skip_inject_dossier_tabs():
     output_dir = WORKSPACE / "output"
-    out_file = output_dir / "player_behavior_dashboard.html"
+    dashboards_dir = WORKSPACE / "output" / "dashboards"
+    out_file = dashboards_dir / "player_behavior_dashboard.html"
     if not out_file.exists() or out_file.stat().st_size == 0:
         return False
     # Depends on all_players_index.json (merged/legacy) and individual_dossiers_data.json
@@ -300,7 +301,7 @@ def should_skip_inject_dossier_tabs():
 
 
 def should_skip_probability_dashboard():
-    output_dir = WORKSPACE / "output"
+    output_dir = WORKSPACE / "output" / "dashboards"
     out_file = output_dir / "game_probability_dashboard.html"
     dependencies = [
         output_dir / "game_probability_he_data.json",
@@ -417,11 +418,11 @@ def main():
             print(f"  - {label}: {detail}")
         return 1
 
-    print("ALL STEPS COMPLETED SUCCESSFULLY")
+print("ALL STEPS COMPLETED SUCCESSFULLY")
     print("\nRegenerated outputs:")
-    print("  - output/bi_dashboard.html")
-    print("  - output/player_behavior_dashboard.html")
-    print("  - output/game_probability_dashboard.html")
+    print("  - output/dashboards/bi_dashboard.html")
+    print("  - output/dashboards/player_behavior_dashboard.html")
+    print("  - output/dashboards/game_probability_dashboard.html")
     print("  - output/game_probability_he_data.json")
     print("  - output/dashboard_data.json")
     print("  - output/player_behavior_data.json")
