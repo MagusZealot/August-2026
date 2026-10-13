@@ -1,4 +1,14 @@
-with open(r"C:\Users\IT-40126\Documents\August 2026-20261008T011759Z-1-001\August 2026\output\bi_dashboard.html", "r", encoding="utf-8") as f:
+from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+WORKSPACE = SCRIPT_DIR.parent.parent
+if not (WORKSPACE / "workspace_map.txt").exists():
+    for _parent in WORKSPACE.parents:
+        if (_parent / "workspace_map.txt").exists():
+            WORKSPACE = _parent
+            break
+
+with open(WORKSPACE / "output" / "bi_dashboard.html", "r", encoding="utf-8") as f:
     text = f.read()
 
 print("File size:", len(text))

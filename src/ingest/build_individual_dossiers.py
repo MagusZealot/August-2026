@@ -1,3 +1,13 @@
+from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+WORKSPACE = SCRIPT_DIR.parent.parent
+if not (WORKSPACE / "workspace_map.txt").exists():
+    for _parent in WORKSPACE.parents:
+        if (_parent / "workspace_map.txt").exists():
+            WORKSPACE = _parent
+            break
+
 import csv
 import json
 import sys
@@ -8,8 +18,8 @@ from collections import defaultdict
 sys.path.insert(0, str(Path(__file__).parent))
 from currency_converter import convert_to_php, get_country
 
-FOLDER = Path(r"C:\Users\IT-40126\Documents\August 2026-20261008T011759Z-1-001\August 2026\data\raw")
-REPORT_DIR = Path(r"C:\Users\IT-40126\Documents\August 2026-20261008T011759Z-1-001\August 2026\output")
+FOLDER = Path(WORKSPACE / "data" / "raw")
+REPORT_DIR = Path(WORKSPACE / "output")
 
 # 1. Load Whales
 whales_dict = {}

@@ -1,7 +1,17 @@
+from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+WORKSPACE = SCRIPT_DIR.parent.parent
+if not (WORKSPACE / "workspace_map.txt").exists():
+    for _parent in WORKSPACE.parents:
+        if (_parent / "workspace_map.txt").exists():
+            WORKSPACE = _parent
+            break
+
 import pandas as pd
 import numpy as np
 
-df = pd.read_csv('C:/Users/IT-40126/Documents/August 2026-20261008T011759Z-1-001/August 2026/data/raw/2026-10-06-13-38-11_EXPORT_CSV_45625_808_0.csv')
+df = pd.read_csv('WORKSPACE/data/raw/2026-10-06-13-38-11_EXPORT_CSV_45625_808_0.csv')
 
 print('Shape:', df.shape)
 print('Unique game_codes:', df['game_code'].nunique())

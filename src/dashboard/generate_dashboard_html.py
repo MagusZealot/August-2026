@@ -1,15 +1,25 @@
+from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+WORKSPACE = SCRIPT_DIR.parent.parent
+if not (WORKSPACE / "workspace_map.txt").exists():
+    for _parent in WORKSPACE.parents:
+        if (_parent / "workspace_map.txt").exists():
+            WORKSPACE = _parent
+            break
+
 import json
 from pathlib import Path
 from collections import defaultdict
 
-DATA_FILE = Path(r"C:\Users\IT-40126\Documents\August 2026-20261008T011759Z-1-001\August 2026\output\dashboard_data.json")
+DATA_FILE = Path(WORKSPACE / "output" / "dashboard_data.json")
 with open(DATA_FILE, "r", encoding="utf-8") as f:
     master_data = json.load(f)
 
 json_str = json.dumps(master_data)
 
 # ── MERGE PER-FILE DOSSIER INDICES INTO UNIFIED INDEX ──────────────────────
-REPORT_DIR = Path(r"C:\Users\IT-40126\Documents\August 2026-20261008T011759Z-1-001\August 2026\output")
+REPORT_DIR = Path(WORKSPACE / "output")
 CHUNK_DIR = REPORT_DIR / "dossier_chunks"
 CHUNK_DIR.mkdir(parents=True, exist_ok=True)
 CHUNK_SIZE = 1000
@@ -230,7 +240,7 @@ else:
 index_meta = unified_index.get("meta", {})
 index_players = unified_index.get("players", [])
 
-DOSSIER_DATA_FILE = Path(r"C:\Users\IT-40126\Documents\August 2026-20261008T011759Z-1-001\August 2026\output\individual_dossiers_data.json")
+DOSSIER_DATA_FILE = Path(WORKSPACE / "output" / "individual_dossiers_data.json")
 with open(DOSSIER_DATA_FILE, "r", encoding="utf-8") as df:
     detailed_operators = json.load(df).get("operators", [])
 
@@ -2990,8 +3000,8 @@ const topCountry = countryDist[0];
 </body>
 </html>'''
 
-out_path_1 = Path(r"C:\Users\IT-40126\Documents\August 2026-20261008T011759Z-1-001\August 2026\output\dashboards\bi_dashboard.html")
-out_path_2 = Path(r"C:\Users\IT-40126\Documents\August 2026-20261008T011759Z-1-001\August 2026\output\dashboards\bi_dashboard.html")
+out_path_1 = Path(WORKSPACE / "output" / "dashboards" / "bi_dashboard.html")
+out_path_2 = Path(WORKSPACE / "output" / "dashboards" / "bi_dashboard.html")
 
 with open(out_path_1, "w", encoding="utf-8") as f:
     f.write(html_template)

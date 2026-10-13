@@ -418,7 +418,7 @@ def main():
             print(f"  - {label}: {detail}")
         return 1
 
-print("ALL STEPS COMPLETED SUCCESSFULLY")
+    print("ALL STEPS COMPLETED SUCCESSFULLY")
     print("\nRegenerated outputs:")
     print("  - output/dashboards/bi_dashboard.html")
     print("  - output/dashboards/player_behavior_dashboard.html")

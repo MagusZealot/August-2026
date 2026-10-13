@@ -9,9 +9,9 @@ Scripts discover files via **glob patterns** — not a fixed count of 27:
 | Script(s) | Pattern | Scope |
 |-----------|---------|-------|
 | Steps 1-5, 6, 13 | `*.csv` / `*EXPORT_CSV*.csv` / `mnt_game_probability_he_YYYYMMDD.csv` | **All matching files** |
-| Steps 7-8 | First 5 `*EXPORT_CSV*.csv` (by name sort) | **First 5 only** (performance) |
+| Steps 7-8 | Random 5 `*EXPORT_CSV*.csv` (sampled via `random.sample()`) | **5 randomly sampled** (performance + representativeness) |
 
-**Adding more files:** Drop new CSVs into `raw/` or `probability/` — steps 1-6 and 13 auto-process them on next pipeline run. Steps 7-8 stay limited to first 5.
+**Adding more files:** Drop new CSVs into `raw/` or `probability/` — steps 1-6 and 13 auto-process them on next pipeline run. Steps 7-8 stay limited to 5 exports (Step 7 uses random sampling).
 
 ---
 

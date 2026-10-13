@@ -1,8 +1,18 @@
+from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+WORKSPACE = SCRIPT_DIR.parent.parent
+if not (WORKSPACE / "workspace_map.txt").exists():
+    for _parent in WORKSPACE.parents:
+        if (_parent / "workspace_map.txt").exists():
+            WORKSPACE = _parent
+            break
+
 import os
 import csv
 from collections import defaultdict
 
-REPORT_DIR = r"C:\Users\IT-40126\Documents\August 2026-20261008T011759Z-1-001\August 2026\output"
+REPORT_DIR = WORKSPACE / "output"
 
 print("=================== 1. WHALE ANALYSIS ===================")
 with open(os.path.join(REPORT_DIR, "whale_analysis.csv"), "r", encoding="utf-8") as f:

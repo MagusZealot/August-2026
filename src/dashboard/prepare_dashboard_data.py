@@ -1,10 +1,20 @@
+from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+WORKSPACE = SCRIPT_DIR.parent.parent
+if not (WORKSPACE / "workspace_map.txt").exists():
+    for _parent in WORKSPACE.parents:
+        if (_parent / "workspace_map.txt").exists():
+            WORKSPACE = _parent
+            break
+
 import os
 import csv
 import json
 from pathlib import Path
 from collections import defaultdict
 
-REPORT_DIR = Path(r"C:\Users\IT-40126\Documents\August 2026-20261008T011759Z-1-001\August 2026\output")
+REPORT_DIR = Path(WORKSPACE / "output")
 
 # 1. Whale Analysis
 whales = []

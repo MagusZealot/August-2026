@@ -1,9 +1,19 @@
+from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+WORKSPACE = SCRIPT_DIR.parent.parent
+if not (WORKSPACE / "workspace_map.txt").exists():
+    for _parent in WORKSPACE.parents:
+        if (_parent / "workspace_map.txt").exists():
+            WORKSPACE = _parent
+            break
+
 import csv
 from pathlib import Path
 from collections import defaultdict
 from datetime import datetime
 
-FOLDER = Path(r"C:\Users\IT-40126\Documents\August 2026-20261008T011759Z-1-001\August 2026\data\raw")
+FOLDER = Path(WORKSPACE / "data" / "raw")
 files = sorted(FOLDER.glob("*EXPORT_CSV*.csv"))
 
 # Inspect 2 files thoroughly for:

@@ -5,6 +5,16 @@ Each export is processed independently. The CSV is streamed once to produce
 the compact index and again to construct typed trajectory buffers. The large
 merged all_players_dossiers JSON is deliberately opt-in.
 """
+from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+WORKSPACE = SCRIPT_DIR.parent.parent
+if not (WORKSPACE / "workspace_map.txt").exists():
+    for _parent in WORKSPACE.parents:
+        if (_parent / "workspace_map.txt").exists():
+            WORKSPACE = _parent
+            break
+
 
 import csv
 import json
@@ -20,8 +30,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from currency_converter import convert_to_php, CURRENCY_COUNTRY
 
-FOLDER = Path(r"C:\Users\IT-40126\Documents\August 2026-20261008T011759Z-1-001\August 2026\data\raw")
-REPORT_DIR = Path(r"C:\Users\IT-40126\Documents\August 2026-20261008T011759Z-1-001\August 2026\output")
+FOLDER = Path(WORKSPACE / "data" / "raw")
+REPORT_DIR = Path(WORKSPACE / "output")
 CHUNK_SIZE = 1000
 MAX_WORKERS = min(max(os.cpu_count() or 2, 2), 4)
 WRITE_MONOLITH = os.environ.get("BUILD_DOSSIER_MONOLITH", "0").strip().lower() in {"1", "true", "yes"}

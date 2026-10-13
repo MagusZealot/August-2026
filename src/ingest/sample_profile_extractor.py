@@ -1,10 +1,20 @@
+from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+WORKSPACE = SCRIPT_DIR.parent.parent
+if not (WORKSPACE / "workspace_map.txt").exists():
+    for _parent in WORKSPACE.parents:
+        if (_parent / "workspace_map.txt").exists():
+            WORKSPACE = _parent
+            break
+
 import csv
 from pathlib import Path
 from collections import defaultdict
 import json
 
-FOLDER = Path(r"C:\Users\IT-40126\Documents\August 2026-20261008T011759Z-1-001\August 2026\data\raw")
-REPORT_DIR = Path(r"C:\Users\IT-40126\Documents\August 2026-20261008T011759Z-1-001\August 2026\output")
+FOLDER = Path(WORKSPACE / "data" / "raw")
+REPORT_DIR = Path(WORKSPACE / "output")
 
 # 1. Load Whales and Top Chasers to identify the key players to profile
 whales = []

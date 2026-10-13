@@ -83,7 +83,7 @@ flowchart TD
         S4["Step 4 · operator_analysis.py"]
         S5["Step 5 · generate_heatmap_matrix.py"]
         S6["Step 6 · build_all_players_dossiers.py"]
-        S7["Step 7 · generate_player_behavior_data.py<br/>first 5 exports"]
+        S7["Step 7 · generate_player_behavior_data.py<br/>random 5 exports"]
         S8["Step 8 · build_individual_dossiers.py<br/>first 5 exports + derived CSVs"]
         S13["Step 13 · probability_he_ingest.py"]
     end
@@ -188,11 +188,11 @@ Ingestion scripts use **glob patterns** to discover raw CSV files in `data/raw/`
 |--------|-------------------|-----------|
 | Steps 1-5 (`whale_tracking`, `time_series_analysis`, `chaser_detection`, `operator_analysis`, `generate_heatmap_matrix`) | `*.csv` in `data/raw/` | **All** matching files |
 | Step 6 (`build_all_players_dossiers`) | `*EXPORT_CSV*.csv` in `data/raw/` | **Each file independently** → creates per-export index (`all_players_index_XX.json`) + chunks (`dossier_chunks_XX/`) |
-| Step 7 (`generate_player_behavior_data`) | First 5 `*EXPORT_CSV*.csv` (sorted) | **Only first 5** |
+| Step 7 (`generate_player_behavior_data`) | Random 5 `*EXPORT_CSV*.csv` (sampled via `random.sample()`) | **5 randomly sampled** |
 | Step 8 (`build_individual_dossiers`) | First 5 exports + derived CSVs | **Only first 5** exports |
 | Step 13 (`probability_he_ingest`) | `mnt_game_probability_he_YYYYMMDD.csv` in `data/probability/` | **All** daily snapshots |
 
-**Adding more raw exports:** Steps 1-6 and 13 automatically process new files on next run. Steps 7-8 remain limited to first 5 for performance. Skip-guards use file modification times — new files trigger reprocessing of dependent steps.
+**Adding more raw exports:** Steps 1-6 and 13 automatically process new files on next run. Steps 7-8 remain limited to 5 exports for performance (Step 7 uses random sampling for representativeness). Skip-guards use file modification times — new files trigger reprocessing of dependent steps.
 
 See `workspace_map.txt` sections 2A and 6 for complete details.
 

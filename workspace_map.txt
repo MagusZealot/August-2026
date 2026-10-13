@@ -220,13 +220,14 @@ NOTE: post-regeneration (regenerate_summary_csvs.py) the CSV holds every
     their complete chunk sets exist and are newer than their source exports.
 
 • generate_player_behavior_data.py  [pipeline step 7]
-    Params: FOLDER=data\raw, REPORT_DIR=output. Reads FIRST 5
-    "*EXPORT_CSV*.csv" only. Computes game stats, hourly credit/win,
-    device split, balance tiers, bet brackets, inter-bet intervals,
-    win/loss bet progression.
+    Params: FOLDER=data\raw, REPORT_DIR=output. Randomly samples 5
+    "*EXPORT_CSV*.csv" files from all 27 exports using random.sample().
+    Computes game stats, hourly credit/win, device split, balance tiers,
+    bet brackets, inter-bet intervals, win/loss bet progression.
+    Logs the 5 randomly selected filenames for traceability.
     Output: player_behavior_data.json
     Skip-guard: skipped by the wrapper if player_behavior_data.json exists
-    and is newer than the first 5 raw exports.
+    and is newer than the sampled raw exports.
 
 • build_individual_dossiers.py  [pipeline step 8]
     Params: FOLDER=data\raw, REPORT_DIR=output. Reads whale/chaser/

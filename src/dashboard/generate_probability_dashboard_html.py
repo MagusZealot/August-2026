@@ -1,10 +1,20 @@
 #!/usr/bin/env python3
 """Generate the standalone game probability and house-edge dashboard."""
+from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+WORKSPACE = SCRIPT_DIR.parent.parent
+if not (WORKSPACE / "workspace_map.txt").exists():
+    for _parent in WORKSPACE.parents:
+        if (_parent / "workspace_map.txt").exists():
+            WORKSPACE = _parent
+            break
+
 
 import json
 from pathlib import Path
 
-WORKSPACE = Path(r"C:\Users\IT-40126\Documents\August 2026-20261008T011759Z-1-001\August 2026")
+WORKSPACE = Path(WORKSPACE)
 DATA_FILE = WORKSPACE / "output" / "game_probability_he_data.json"
 OUT_FILE = WORKSPACE / "output" / "dashboards" / "game_probability_dashboard.html"
 
