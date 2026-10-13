@@ -24,22 +24,22 @@ py scripts/generate_all_dashboards.py
 
 ```
 August 2026/
-├── .gitignore                 # Excludes data/, output/, cache files
-├── .kilo/                     # Kilo agent configuration
-├── data/                      # RAW DATA (gitignored) — see data/README.md
-│   ├── raw/                   # 27 CSV exports (~9.5 GB)
-│   └── probability/           # Daily HE/probability snapshots
-├── scripts/                   # Pipeline entry points
-│   ├── generate_all_dashboards.py   # 14-step master wrapper
+├── .gitignore                        # Excludes data/, output/, cache files
+├── .kilo/                            # Kilo agent configuration
+├── data/                             # RAW DATA (gitignored) — see data/README.md
+│   ├── raw/                          # 27 CSV exports (~9.5 GB)
+│   └── probability/                  # Daily HE/probability snapshots
+├── scripts/                          # Pipeline entry points
+│   ├── generate_all_dashboards.py    # 14-step master wrapper
 │   └── generate_chart.js
-├── src/                       # All Python data scripts
-│   ├── ingest/                # Raw-data ingestion & analysis (steps 1-8, 13)
-│   └── dashboard/             # Dashboard data prep & rendering (steps 9-12, 14)
-└── output/                    # GENERATED ARTIFACTS (gitignored)
-    ├── dashboards/            # Final HTML dashboards
-    ├── data/                  # JSON payloads (indexes, behavior, dossiers)
-    ├── chunks/                # Lazy-load trajectory chunks (~180 MB)
-    └── reports/               # Summary CSVs (whale, chaser, operator, etc.)
+├── src/                              # All Python data scripts
+│   ├── ingest/                       # Raw-data ingestion & analysis (steps 1-8, 13)
+│   └── dashboard/                    # Dashboard data prep & rendering (steps 9-12, 14)
+└── output/                           # GENERATED ARTIFACTS (gitignored)
+    ├── dashboards/                   # Final HTML dashboards
+    ├── data/                         # JSON payloads (indexes, behavior, dossiers)
+    ├── chunks/                       # Lazy-load trajectory chunks (~180 MB)
+    └── reports/                      # Summary CSVs (whale, chaser, operator, etc.)
 ```
 
 ---
