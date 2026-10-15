@@ -38,11 +38,17 @@ Large files (name-only, DO NOT READ):
  │   ├── .gitignore
  │   └── kilo.jsonc
  │
- ├── data/
- │   ├── probability/                                 (cached published game probability snapshots)
- │   │   ├── mnt_game_probability_he_YYYYMMDD.csv
- │   │   └── _manifest.json                           (scan range and unavailable dates)
- │   └── raw/                                         (27 raw CSV exports — NAME ONLY)
+├── data/
+  │   ├── probability/                                 (cached published game probability snapshots)
+  │   │   ├── mnt_game_probability_he_YYYYMMDD.csv
+  │   │   └── _manifest.json                           (scan range and unavailable dates)
+  │   ├── round_dealer_time/                            (cached daily dealer pace snapshots)
+  │   │   ├── mnt_round_dealer_time_daily_YYYYMMDD.csv
+  │   │   └── _manifest.json
+  │   ├── round_table_time/                             (cached daily table pace snapshots)
+  │   │   ├── mnt_round_table_time_daily_YYYYMMDD.csv
+  │   │   └── _manifest.json
+  │   └── raw/                                         (27 raw CSV exports — NAME ONLY)
  │       ├── 2026-10-06-13-38-11_EXPORT_CSV_45625_808_0.csv
  │       ├── 2026-10-06-14-02-59_EXPORT_CSV_45627_085_0.csv
  │       ├── ... (25 more, 2026-10-06 through 2026-10-07) ...
@@ -91,33 +97,35 @@ Large files (name-only, DO NOT READ):
  │       ├── verify_behavior_dashboard.py
  │       └── verify_dashboard.py
  │
- |-- output/ (generated artifacts)
- |   |-- dashboards/
- |   |   |-- bi_dashboard.html
- |   |   |-- game_probability_dashboard.html
- |   |   |-- player_behavior_dashboard.html
- |   |   `-- viewer.html
- |   |-- data/
- |   |   |-- all_players_index.json
- |   |   |-- all_players_index_00.json ... all_players_index_26.json
- |   |   |-- dashboard_data.json
- |   |   |-- game_probability_he_data.json
- |   |   |-- individual_dossiers_data.json
- |   |   `-- player_behavior_data.json
- |   |-- dossiers/
- |   |   `-- all_players_dossiers_00.json ... all_players_dossiers_26.json
- |   |-- chunks/
- |   |   |-- dossier_chunks/                            (aggregate chunks; chunk_0000.js ... chunk_0050.js)
- |   |   |-- dossier_chunks_00/ ... dossier_chunks_26/  (per-export chunks)
- |   |-- progress/
- |   |   `-- progress.json
- |   `-- reports/
- |       |-- chaser_detection.csv
- |       |-- country_hourly_heatmap.csv
- |       |-- hourly_traffic.csv
- |       |-- operator_performance.csv
- |       |-- time_series_analysis.csv
- |       `-- whale_analysis.csv
+|-- output/ (generated artifacts)
+  |   |-- dashboards/
+  |   |   |-- bi_dashboard.html
+  |   |   |-- game_probability_dashboard.html
+  |   |   |-- player_behavior_dashboard.html
+  |   |   |-- round_dealer_table_time_dashboard.html
+  |   |   `-- viewer.html
+  |   |-- data/
+  |   |   |-- all_players_index.json
+  |   |   |-- all_players_index_00.json ... all_players_index_26.json
+  |   |   |-- dashboard_data.json
+  |   |   |-- game_probability_he_data.json
+  |   |   |-- individual_dossiers_data.json
+  |   |   |-- player_behavior_data.json
+  |   |   `-- round_dealer_table_time_data.json
+  |   |-- dossiers/
+  |   |   `-- all_players_dossiers_00.json ... all_players_dossiers_26.json
+  |   |-- chunks/
+  |   |   |-- dossier_chunks/                            (aggregate chunks; chunk_0000.js ... chunk_0050.js)
+  |   |   |-- dossier_chunks_00/ ... dossier_chunks_26/  (per-export chunks)
+  |   |-- progress/
+  |   |   `-- progress.json
+  |   `-- reports/
+  |       |-- chaser_detection.csv
+  |       |-- country_hourly_heatmap.csv
+  |       |-- hourly_traffic.csv
+  |       |-- operator_performance.csv
+  |       |-- time_series_analysis.csv
+  |       `-- whale_analysis.csv
  |
  ├── docs/
  │   └── analysis_log.txt                               (run log)
@@ -564,6 +572,9 @@ argv is passed; each writes output\progress.json). Invoke with:
   [13/14] probability_he_ingest.py   -> game_probability_he_data.json (refresh/backfill)
   [14/14] generate_probability_dashboard_html.py -> game_probability_dashboard.html
 
+  [15/15] round_dealer_table_time_ingest.py -> round_dealer_table_time_data.json
+  [16/16] generate_round_dealer_table_time_dashboard_html.py -> round_dealer_table_time_dashboard.html
+
 Features:
   - ProgressBar (bar + % + ETA) rendered to stdout as steps complete
   - Skip-guards: steps are skipped when outputs exist and are newer than their
@@ -579,6 +590,8 @@ Features:
     * Step 12: player_behavior_dashboard.html (post-injection) newer than all_players_index.json and individual_dossiers_data.json
     * Step 13: always runs; uses cached files and checks/backfills source gaps
     * Step 14: game_probability_dashboard.html newer than game_probability_he_data.json and its generator
+    * Step 15: round_dealer_table_time_data.json newer than its generator script
+    * Step 16: round_dealer_table_time_dashboard.html newer than the data payload and its generator
   - Missing scripts are reported as [SKIP] and counted as failures
   - Exit code 0 = all steps OK, 1 = one or more failures (listed at the end)
 
@@ -1054,7 +1067,7 @@ change).
 ==============================================================================
 
 ==============================================================================
-   15. RECENT UPDATE (2026-10-13) — UNIFIED DEALER & TABLE PACE CONSOLE
+   15. RECENT UPDATE (2026-10-15) — UNIFIED DEALER & TABLE PACE CONSOLE
 ==============================================================================
 
 The master dashboard pipeline now uses one combined pace data source and one
@@ -1076,6 +1089,31 @@ dashboard generator:
     round_table_time_dashboard.html outputs, plus their two dashboard HTML
     generator scripts, have been retired. The standalone ingest scripts remain
     in src\ingest\ but are not part of the master pipeline.
+
+  Data sources:
+    - Dealer snapshots: https://ogp.oss-ap-southeast-1.aliyuncs.com/share/
+      mnt_round_dealer_time_daily_YYYYMMDD.csv  (cached in data/round_dealer_time/)
+    - Table snapshots: https://ogp.oss-ap-southeast-1.aliyuncs.com/share/
+      mnt_round_table_time_daily_YYYYMMDD.csv  (cached in data/round_table_time/)
+    - CSV columns: BILLING_DATE, GAME_TYPE, DEALER|TABLE_NO, AVG_TIMEDIFF,
+      STD_TIMEDIFF (verified 2026-10-12)
+
+  Console features:
+    - KPI strip: Global Average Pace, Selected Game Baseline, Average Std Dev,
+      Active Fleet (dealer/table counts)
+    - Watchlist: Slow Dealers — dealers slower than the selected game's baseline
+      by >= 1.50 s or in its slowest 10%, paginated (20/page) horizontal bar
+      chart with color-coded severity
+    - Combined Efficiency Matrix — scatter of Avg Time (speed) vs Std Dev
+      (consistency) for all dealer+table profiles in the selected game
+    - Dealer Speed Over Time — daily baseline line plus up to five fastest and
+      five slowest dealer trend lines, with dataZoom and markLine average
+    - Top / Bottom 10 Dealer & Table Profiles — horizontal bar chart ranked by
+      average time, fastest in green, slowest in red, both in amber
+    - Individualized Dealer Dossier — card grid of dealers with KPIs and a
+      per-dealer trend chart (lazy-loaded on click)
+    - Forensics table — full telemetry listing with billing date, game type,
+      dealer, table no, avg time and std dev
 
 ==============================================================================
 EOF
