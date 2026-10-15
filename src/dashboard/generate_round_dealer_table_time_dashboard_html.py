@@ -129,9 +129,11 @@ def render_dashboard(data):
     td:first-child, th:first-child { text-align: left; }
     tbody tr:hover { background: #17243a; }
     .table-empty { padding: 18px 12px; color: #94a3b8; font-size: 12px; font-style: italic; text-align: left; }
-    .dealer-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-    @media (max-width: 1200px) { .dealer-grid { grid-template-columns: repeat(3, 1fr); } }
-    @media (max-width: 900px) { .dealer-grid { grid-template-columns: repeat(2, 1fr); } }
+    .dealer-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; }
+    @media (max-width: 1600px) { .dealer-grid { grid-template-columns: repeat(5, 1fr); } }
+    @media (max-width: 1300px) { .dealer-grid { grid-template-columns: repeat(4, 1fr); } }
+    @media (max-width: 1000px) { .dealer-grid { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 700px) { .dealer-grid { grid-template-columns: repeat(2, 1fr); } }
     @media (max-width: 560px) { .dealer-grid { grid-template-columns: 1fr; } }
     .dossier-section { padding: 16px; }
     .dossier-section .card { padding: 16px; }
@@ -167,10 +169,8 @@ def render_dashboard(data):
     <section class="card watchlist section" aria-labelledby="watchlistTitle">
       <h3 id="watchlistTitle"><i class="fa-solid fa-triangle-exclamation"></i> Watchlist: Slow Dealers</h3>
       <p class="muted">Dealers slower than the selected game's baseline by at least 1.50 seconds or in its slowest 10%.</p>
-      <div class="pagination">
-        <span id="watchlistPageInfo">Loading watchlist…</span>
-        <button id="watchlistPrevPage" type="button">&larr; Prev</button>
-        <button id="watchlistNextPage" type="button">Next &rarr;</button>
+      <div style="margin-bottom: 12px;">
+        <span id="watchlistPageInfo" style="color: #94a3b8; font-size: 12px;">Loading watchlist…</span>
       </div>
       <div class="chart-card">
         <div id="watchlistChart" class="chart"></div>
@@ -189,16 +189,20 @@ def render_dashboard(data):
       </div>
     </section>
     <section class="grid section">
-      <article class="card chart-card">
+      <article class="card chart-card wide full-width">
         <h3>Combined Efficiency Matrix</h3>
         <div class="muted">Average time (speed) vs standard deviation (consistency), selected game only</div>
         <div id="efficiencyMatrix" class="chart"></div>
       </article>
-      <article class="card chart-card">
+    </section>
+    <section class="grid section">
+      <article class="card chart-card wide full-width">
         <h3>Dealer Speed Over Time</h3>
         <div class="muted">Selected game's daily dealer baseline and up to five fastest and five slowest dealer trends</div>
         <div id="dealerTrend" class="chart"></div>
       </article>
+    </section>
+    <section class="grid section">
       <article class="card chart-card wide">
         <h3>Top / Bottom 10 Dealer & Table Profiles</h3>
         <div class="muted">Fastest and slowest entity profiles by average time, ranked within the selected game only</div>
@@ -256,7 +260,6 @@ def render_dashboard(data):
           </div>
         </div>
       </section>
-    </section>
     <footer>Source: combined daily dealer and table pace snapshots. Change the game selector to isolate all KPIs, charts, and tables to another game.</footer>
   </main>
   <script id="pace-console-data" type="application/json">__PAYLOAD__</script>
@@ -265,7 +268,6 @@ def render_dashboard(data):
     const ROWS = Array.isArray(DATA.rows) ? DATA.rows : [];
     const gameTagsContainer = document.getElementById('gameTags');
     let selectedGame = null;
-    let currentPage = 1;
     let currentTablePage = 1;
     const getChartTheme = () => ({
       textColor: '#94a3b8',
@@ -393,14 +395,6 @@ def render_dashboard(data):
         return delta > 0 && (delta >= 1.5 || item.avg >= slowDecileFloor);
       }).sort((a, b) => b.avg - a.avg);
       
-      // Pagination: show up to 20 dealers per page
-      const itemsPerPage = 20;
-      const page = Math.max(1, Math.min(currentPage, Math.ceil(flagged.length / itemsPerPage) || 1));
-      const startIdx = (page - 1) * itemsPerPage;
-      const endIdx = startIdx + itemsPerPage;
-      const pageFlagged = flagged.slice(startIdx, endIdx);
-      const totalPages = Math.ceil(flagged.length / itemsPerPage) || 1;
-      
       if (!flagged.length) {
         charts.watchlist.clear();
         charts.watchlist.setOption({
@@ -409,7 +403,9 @@ def render_dashboard(data):
         document.getElementById('watchlistPageInfo').textContent = '0 dealers';
         return;
       }
-      const points = pageFlagged.map(item => ({
+      
+      // Show ALL flagged dealers (no pagination)
+      const points = flagged.map(item => ({
         value: item.avg,
         label: item.dealer,
         delta: item.avg - baseline
@@ -462,18 +458,8 @@ def render_dashboard(data):
         }
       });
       
-      // Update pagination display
-      document.getElementById('watchlistPageInfo').textContent = `Showing ${startIdx + 1}-${Math.min(endIdx, flagged.length)} of ${flagged.length}`;
-      document.getElementById('watchlistPrevPage').disabled = page <= 1;
-      document.getElementById('watchlistNextPage').disabled = page >= totalPages;
-      document.getElementById('watchlistPrevPage').onclick = () => {
-        currentPage = Math.max(1, currentPage - 1);
-        renderWatchlist(rows);
-      };
-      document.getElementById('watchlistNextPage').onclick = () => {
-        currentPage = Math.min(totalPages, currentPage + 1);
-        renderWatchlist(rows);
-      };
+      // Update pagination display - show total count
+      document.getElementById('watchlistPageInfo').textContent = `${flagged.length} dealer(s) flagged`;
     }
 
     function renderTableWatchlist(rows) {
@@ -589,8 +575,16 @@ def render_dashboard(data):
       const gameType = selectedGame;
       const color = currentGameColor(gameType);
       const points = summarizeProfiles(rows).filter(profile => profile.avg != null && profile.std != null);
+      
+      const dealerPoints = points.filter(p => p.dealer);
+      const tablePoints = points.filter(p => !p.dealer);
+      const dealerAvg = mean(dealerPoints.map(p => p.avg));
+      const dealerStd = mean(dealerPoints.map(p => p.std));
+      const tableAvg = mean(tablePoints.map(p => p.avg));
+      const tableStd = mean(tablePoints.map(p => p.std));
+      
       charts.efficiencyMatrix.setOption({
-        color: [color],
+        color: ['#38bdf8', '#fbbf24'],
         tooltip: {
           ...tooltipStyle,
           trigger: 'item',
@@ -599,21 +593,64 @@ def render_dashboard(data):
             return `<strong>${escapeHtml(profile.label)}</strong><br>Dealer: ${safeCell(profile.dealer)}<br>Table No: ${safeCell(profile.tableNo)}<br>Game Type: ${escapeHtml(gameType)}<br>Avg Time: ${fmt2(profile.avg)} s<br>Std Dev: ${fmt2(profile.std)} s`;
           }
         },
-        legend: { top: 0, data: [gameType], textStyle: { color: theme.textColor, fontSize: 11 } },
+        legend: {
+          top: 0,
+          data: ['Dealers', 'Tables'],
+          textStyle: { color: theme.textColor, fontSize: 11 },
+          icon: 'circle',
+          itemWidth: 10,
+          itemHeight: 10
+        },
         grid: { left: 62, right: 22, top: 42, bottom: 54 },
-        xAxis: { type: 'value', name: 'AVG_TIMEDIFF · Speed (s)', nameLocation: 'middle', nameGap: 30, nameTextStyle: { color: theme.textColor, fontSize: 11 }, ...axisStyle },
-        yAxis: { type: 'value', name: 'STD_TIMEDIFF · Consistency (s)', nameTextStyle: { color: theme.textColor, fontSize: 11 }, ...axisStyle },
-        series: [{
-          name: gameType,
-          type: 'scatter',
-          symbolSize: 11,
-          itemStyle: { color, opacity: 0.85, borderColor: '#0f172a', borderWidth: 1 },
-          data: points.map(profile => ({
-            value: [profile.avg, profile.std],
-            symbol: profile.dealer && profile.tableNo ? 'circle' : profile.tableNo ? 'diamond' : 'circle',
-            profile
-          }))
-        }]
+        xAxis: { 
+          type: 'value', 
+          name: 'AVG_TIMEDIFF · Speed (s)', 
+          nameLocation: 'middle', 
+          nameGap: 30, 
+          nameTextStyle: { color: theme.textColor, fontSize: 11 }, 
+          ...axisStyle 
+        },
+        yAxis: { 
+          type: 'value', 
+          name: 'STD_TIMEDIFF · Consistency (s)', 
+          nameTextStyle: { color: theme.textColor, fontSize: 11 }, 
+          ...axisStyle 
+        },
+        series: [
+          {
+            name: 'Dealers',
+            type: 'scatter',
+            symbolSize: 14,
+            itemStyle: { color: '#38bdf8', opacity: 0.85, borderColor: '#0f172a', borderWidth: 1 },
+            data: dealerPoints.map(profile => ({
+              value: [profile.avg, profile.std],
+              symbol: 'circle',
+              profile
+            }))
+          },
+          {
+            name: 'Tables',
+            type: 'scatter',
+            symbolSize: 14,
+            itemStyle: { color: '#fbbf24', opacity: 0.85, borderColor: '#0f172a', borderWidth: 1 },
+            data: tablePoints.map(profile => ({
+              value: [profile.avg, profile.std],
+              symbol: 'diamond',
+              profile
+            }))
+          }
+        ],
+        markLine: {
+          silent: true,
+          symbol: ['none', 'none'],
+          lineStyle: { color: '#64748b', type: 'dashed', width: 1.5, opacity: 0.6 },
+          data: [
+            { xAxis: dealerAvg, label: { formatter: `Dealers ${fmt2(dealerAvg)}s`, color: '#64748b', position: 'insideEndTop', fontSize: 10 } },
+            { xAxis: tableAvg, label: { formatter: `Tables ${fmt2(tableAvg)}s`, color: '#64748b', position: 'insideEndBottom', fontSize: 10 } },
+            { yAxis: dealerStd, label: { formatter: `Dealers ${fmt2(dealerStd)}s`, color: '#64748b', position: 'insideEndTop', fontSize: 10 } },
+            { yAxis: tableStd, label: { formatter: `Tables ${fmt2(tableStd)}s`, color: '#64748b', position: 'insideEndBottom', fontSize: 10 } }
+          ]
+        }
       }, true);
       
       charts.efficiencyMatrix.off('click');
@@ -1071,6 +1108,7 @@ def render_dashboard(data):
         grid: { left: 50, right: 20, top: 30, bottom: 50 },
         xAxis: { type: 'category', boundaryGap: false, data: dates, ...axisStyle, axisLabel: { ...axisStyle.axisLabel, rotate: dates.length > 16 ? 35 : 0, fontSize: 10 } },
         yAxis: { type: 'value', name: 'AVG_TIMEDIFF (s)', nameTextStyle: { color: theme.textColor, fontSize: 11 }, ...axisStyle },
+        dataZoom: [{ type: 'inside' }, { type: 'slider', height: 16, bottom: 10 }],
         series: [{
           name: 'Avg Time',
           type: 'line',
