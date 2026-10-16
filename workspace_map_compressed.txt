@@ -38,7 +38,11 @@ August 2026/
 │   │   └── currency_cache.json            # Cached FX rates
 │   ├── dashboard/            # Dashboard data prep & rendering
 │   │   ├── prepare_dashboard_data.py           # Step 9: Master BI payload
-│   │   ├── generate_dashboard_html.py          # Step 10: MAIN BI Console (bi_dashboard.html)
+│   │   ├── generate_dashboard_html.py          # Step 10: MAIN BI Console (bi_dashboard.html);
+│   │   │                     # Fixed paths: REPORT_DIR→DATA_DIR for index files,
+│   │   │                     # new CHUNK_SRC_DIR for per-file chunks; hardened skip-guard
+│   │   │                     # with chunks_complete() check; removed unverified Executive
+│   │   │                     # Findings & Strategic Directives matrix
 │   │   ├── generate_behavior_dashboard_html.py # Step 11: Behavior Console
 │   │   ├── generate_probability_dashboard_html.py # Step 14: Probability & HE Console
 │   │   ├── generate_round_dealer_table_time_dashboard_html.py # Step 16: Pace Console
@@ -89,7 +93,11 @@ MASTER PIPELINE (16 Steps) — Run: py scripts\generate_all_dashboards.py
   7. generate_player_behavior_data.py → player_behavior_data.json
   8. build_individual_dossiers.py   → individual_dossiers_data.json (42 players + 35 operators)
   9. prepare_dashboard_data.py      → dashboard_data.json (master BI payload)
- 10. generate_dashboard_html.py     → bi_dashboard.html (MAIN BI CONSOLE)
+ 10. generate_dashboard_html.py     → bi_dashboard.html (MAIN BI CONSOLE);
+         Fixed paths: REPORT_DIR→DATA_DIR for index files, new CHUNK_SRC_DIR for per-file chunks;
+         hardened skip-guard with chunks_complete() check; removed unverified Executive
+         Findings & Strategic Directives matrix (Whale Exposure / Tilt Intervention /
+         Regional Push Windows / B2B Skin Hegemony cards + dead execTilt JS)
  11. generate_behavior_dashboard_html.py → player_behavior_dashboard.html
  12. inject_dossier_tabs.py         → Injects dossier system into behavior console
  13. probability_he_ingest.py       → game_probability_he_data.json (always runs for new snapshots)
@@ -97,7 +105,9 @@ MASTER PIPELINE (16 Steps) — Run: py scripts\generate_all_dashboards.py
  15. round_dealer_table_time_ingest.py → round_dealer_table_time_data.json
  16. generate_round_dealer_table_time_dashboard_html.py → round_dealer_table_time_dashboard.html
 
-Skip-guards: Steps skipped when outputs exist and are newer than dependencies
+Skip-guards: Steps skipped when outputs exist and are newer than dependencies;
+  step 10 adds chunks_complete() check that forces rebuild when output/dossier_chunks/
+  is missing or incomplete (previously only compared timestamps).
 Progress: Each step writes output\progress.json (timestamp, stage, message, progress%, details)
 
 --------------------------------------------------------------------------------

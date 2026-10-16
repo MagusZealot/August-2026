@@ -43,6 +43,7 @@ The ingestion scripts discover or fetch their inputs as follows:
 | 6 | `*EXPORT_CSV*.csv` in `raw/` | Each export is processed independently |
 | 7 | `*EXPORT_CSV*.csv` in `raw/` | Five exports selected randomly |
 | 8 | First five exports in `raw/` and derived CSVs | First five exports only |
+| 10 | `dashboard_data.json` in `output/data/` | Master BI payload read by dashboard generator |
 | 13 | Published probability feed and cache in `probability/` | Refreshes and backfills daily snapshots |
 | 15 | Published dealer and table pace feeds | Fetches available daily snapshots into their cache directories |
 

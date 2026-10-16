@@ -20,6 +20,8 @@ json_str = json.dumps(master_data)
 
 # ── MERGE PER-FILE DOSSIER INDICES INTO UNIFIED INDEX ──────────────────────
 REPORT_DIR = Path(WORKSPACE / "output")
+DATA_DIR = Path(WORKSPACE / "output" / "data")
+CHUNK_SRC_DIR = Path(WORKSPACE / "output" / "chunks")
 CHUNK_DIR = REPORT_DIR / "dossier_chunks"
 CHUNK_DIR.mkdir(parents=True, exist_ok=True)
 CHUNK_SIZE = 1000
@@ -32,7 +34,7 @@ def merge_per_file_dossiers():
     player_data = {}  # pid -> {index_entry, detail_chunks}
     
     for f_idx in range(27):
-        idx_path = REPORT_DIR / f"all_players_index_{f_idx:02d}.json"
+        idx_path = DATA_DIR / f"all_players_index_{f_idx:02d}.json"
         if not idx_path.exists():
             continue
         
@@ -42,7 +44,7 @@ def merge_per_file_dossiers():
         # Load all detail chunks for this file ONCE (avoid re-reading/parsing
         # the same ~1-5MB chunk file for every player entry).
         chunk_details = {}
-        chunk_dir = REPORT_DIR / f"dossier_chunks_{f_idx:02d}"
+        chunk_dir = CHUNK_SRC_DIR / f"dossier_chunks_{f_idx:02d}"
         for cid in range(idx["meta"]["total_chunks"]):
             chunk_path = chunk_dir / f"chunk_{cid:04d}.js"
             if chunk_path.exists():
@@ -204,7 +206,7 @@ def merge_per_file_dossiers():
         "players": final_index_entries,
     }
     
-    INDEX_FILE = REPORT_DIR / "all_players_index.json"
+    INDEX_FILE = DATA_DIR / "all_players_index.json"
     with open(INDEX_FILE, "w", encoding="utf-8") as f:
         json.dump(unified_index, f, ensure_ascii=False, separators=(",", ":"))
     print(f"  -> {INDEX_FILE.name} ({INDEX_FILE.stat().st_size:,} bytes)")
@@ -221,12 +223,33 @@ def merge_per_file_dossiers():
 
 # Load or build the unified index. Per-export chunks may contain fields added
 # after the aggregate was created (for example, timestamps used by the dossier
-# activity calendar), so rebuild whenever a source index is newer.
-INDEX_FILE = REPORT_DIR / "all_players_index.json"
-source_indexes = [REPORT_DIR / f"all_players_index_{f_idx:02d}.json" for f_idx in range(27)]
+# activity calendar), so rebuild whenever a source index is newer. Also force a
+# rebuild when the unified chunks are missing/incomplete (skip-guard previously
+# only compared timestamps, which let an existing-but-stale index short-circuit
+# the merge and leave output/dossier_chunks/ empty → empty dossier tables).
+INDEX_FILE = DATA_DIR / "all_players_index.json"
+source_indexes = [DATA_DIR / f"all_players_index_{f_idx:02d}.json" for f_idx in range(27)]
 source_indexes = [path for path in source_indexes if path.exists()]
+
+def chunks_complete() -> bool:
+    """Return True only if output/dossier_chunks/ holds the expected chunk files."""
+    if not CHUNK_DIR.exists():
+        return False
+    expected = None
+    if INDEX_FILE.exists():
+        try:
+            with open(INDEX_FILE, "r", encoding="utf-8") as f:
+                expected = json.load(f).get("meta", {}).get("total_chunks")
+        except (json.JSONDecodeError, OSError):
+            expected = None
+    chunk_files = [p for p in CHUNK_DIR.glob("chunk_*.js") if p.is_file()]
+    if expected is not None:
+        return len(chunk_files) >= expected
+    return len(chunk_files) > 0
+
 rebuild_unified = (
     not INDEX_FILE.exists()
+    or not chunks_complete()
     or any(path.stat().st_mtime > INDEX_FILE.stat().st_mtime for path in source_indexes)
 )
 if rebuild_unified:
@@ -601,53 +624,7 @@ html_template = f'''<!DOCTYPE html>
           </div>
         </div>
 
-        <!-- Executive Findings Matrix -->
-        <div class="glass-card rounded-2xl p-6">
-          <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
-            <i class="fa-solid fa-clipboard-check text-indigo-400"></i> Executive Findings & Strategic Directives
-          </h3>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-            <div class="p-4 rounded-xl bg-slate-900/90 border border-amber-500/20 space-y-2">
-              <div class="font-bold text-amber-400 flex items-center gap-2">
-                <i class="fa-solid fa-crown"></i> Whale Exposure
-              </div>
-              <p class="text-slate-300">
-                Top 20 whales account for <strong id="execWhaleDebit">—</strong>. The largest whale country controls <strong id="execWhaleTopCountryPct">—</strong> of whale debit. Avg session length is only <strong>11.4 minutes</strong>, proving whales rely on rapid burst betting rather than extended play.
-              </p>
-              <div class="text-[11px] text-amber-300/80 font-mono">Action: VIP Concierge & Liquidity Rings</div>
-            </div>
 
-            <div class="p-4 rounded-xl bg-slate-900/90 border border-rose-500/20 space-y-2">
-              <div class="font-bold text-rose-400 flex items-center gap-2">
-                <i class="fa-solid fa-triangle-exclamation"></i> Tilt Intervention
-              </div>
-              <p class="text-slate-300" id="execTiltText">
-                <strong>—</strong> chasers detected. <strong>—</strong> end as net losers. Chasing begins decisively at <strong>3 consecutive losses</strong> (— trigger rate). Spikes reach up to <strong>—</strong> loss-bet debit.
-              </p>
-              <div class="text-[11px] text-rose-300/80 font-mono">Action: Automated Soft-Cooldowns at L3</div>
-            </div>
-
-            <div class="p-4 rounded-xl bg-slate-900/90 border border-cyan-500/20 space-y-2">
-              <div class="font-bold text-cyan-400 flex items-center gap-2">
-                <i class="fa-solid fa-clock"></i> Regional Push Windows
-              </div>
-              <p class="text-slate-300">
-                Server load swings <strong>2.58x</strong>. Asian markets peak strictly in local evening slots (China 20:00, India/BD 21:00, Japan 19:00). High density markets (Japan 34.3% in 1 hr) require scheduled flash promotions.
-              </p>
-              <div class="text-[11px] text-cyan-300/80 font-mono">Action: Scale Cloud 16:00; Flash Push 18:30</div>
-            </div>
-
-            <div class="p-4 rounded-xl bg-slate-900/90 border border-emerald-500/20 space-y-2">
-              <div class="font-bold text-emerald-400 flex items-center gap-2">
-                <i class="fa-solid fa-building-columns"></i> B2B Skin Hegemony
-              </div>
-              <p class="text-slate-300">
-                Total operator turnover $586.6B with $10.15B GGR. <strong>m88provnd</strong> controls <strong>99.7% of Vietnam</strong> ($163.5B). Indonesian skins show highest profit retention (up to 8.24% hold).
-              </p>
-              <div class="text-[11px] text-emerald-300/80 font-mono">Action: Protect Key Skins & Diversify VN</div>
-            </div>
-          </div>
-        </div>
       </section>
 
       <!-- ========================================================================= -->
@@ -2020,12 +1997,6 @@ const topCountry = countryDist[0];
       if (navFlagged) navFlagged.textContent = chasers.total_count.toLocaleString() + ' Flagged';
       const chaserGroupProfiles = document.getElementById('chaserGroupProfiles');
       if (chaserGroupProfiles) chaserGroupProfiles.textContent = chasers.total_count.toLocaleString() + ' Profiles';
-      const execTilt = document.getElementById('execTiltText');
-      if (execTilt) {{
-        const spikeTxt = topExtreme.length > 0 ? topExtreme[0].spike_multiplier.toFixed(0) + 'x' : 'N/A';
-        execTilt.innerHTML =
-          `<strong>${{chasers.total_count.toLocaleString()}}</strong> chasers detected. <strong>${{chasers.net_loser_pct.toFixed(1)}}% end as net losers</strong>. Chasing begins decisively at <strong>3 consecutive losses</strong> (${{l3Pct.toFixed(1)}}% trigger rate). Spikes reach up to <strong>${{spikeTxt}}</strong> loss-bet debit.`;
-      }}
       const area2Flagged = document.getElementById('area2Flagged');
       if (area2Flagged) area2Flagged.textContent = chasers.total_count.toLocaleString();
       const chaserGroupSubtitle = document.getElementById('chaserGroupSubtitle');

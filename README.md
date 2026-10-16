@@ -29,29 +29,29 @@ Place the required source data before running the pipeline; see
 
 ```
 August 2026/
-├── .gitignore                        # Excludes data/, output/, and cache files
-├── .kilo/                            # Kilo agent configuration
-├── data/                             # Source data (gitignored); see data/README.md
-│   ├── raw/                          # Transaction exports (~9.5 GB)
-│   ├── probability/                  # Daily HE/probability snapshots
-│   ├── round_dealer_time/            # Cached dealer pace snapshots
-│   └── round_table_time/             # Cached table pace snapshots
-├── scripts/                          # Pipeline entry points
-│   ├── generate_all_dashboards.py    # 16-step pipeline wrapper
+├── .gitignore                                      # Excludes data/, output/, and cache files
+├── .kilo/                                          # Kilo agent configuration
+├── data/                                           # Source data (gitignored); see data/README.md
+│   ├── raw/                                        # Transaction exports (~9.5 GB)
+│   ├── probability/                                # Daily HE/probability snapshots
+│   ├── round_dealer_time/                          # Cached dealer pace snapshots
+│   └── round_table_time/                           # Cached table pace snapshots
+├── scripts/                                        # Pipeline entry points
+│   ├── generate_all_dashboards.py                  # 16-step pipeline wrapper
 │   └── generate_chart.js
-├── src/                              # Python data and dashboard scripts
-│   ├── ingest/                       # Ingestion and analysis (steps 1-8, 13, 15)
-│   └── dashboard/                    # Dashboard preparation (steps 9-12, 14, 16)
-└── output/                           # Generated artifacts (gitignored)
-    ├── dashboards/                   # Interactive HTML dashboards
-    │   ├── dashboard-common.css   # Shared stylesheet (consistent look across all dashboards)
-    │   ├── bi_dashboard.html                # Main BI & Risk Intelligence Console
-    │   ├── player_behavior_dashboard.html   # Player Behavioral Intelligence Console
-    │   ├── game_probability_dashboard.html  # Probability & HE Console
+├── src/                                            # Python data and dashboard scripts
+│   ├── ingest/                                     # Ingestion and analysis (steps 1-8, 13, 15)
+│   └── dashboard/                                  # Dashboard preparation (steps 9-12, 14, 16)
+└── output/                                         # Generated artifacts (gitignored)
+    ├── dashboards/                                 # Interactive HTML dashboards
+    │   ├── dashboard-common.css                    # Shared stylesheet (consistent look across all dashboards)
+    │   ├── bi_dashboard.html                       # Main BI & Risk Intelligence Console
+    │   ├── player_behavior_dashboard.html          # Player Behavioral Intelligence Console
+    │   ├── game_probability_dashboard.html         # Probability & HE Console
     │   └── round_dealer_table_time_dashboard.html  # Dealer & Table Pace Intelligence
-    ├── data/                         # JSON payloads (indexes, behavior, dossiers)
-    ├── chunks/                       # Lazy-loaded trajectory chunks (~180 MB)
-    └── reports/                      # Summary CSVs (whale, chaser, operator, etc.)
+    ├── data/                                       # JSON payloads (indexes, behavior, dossiers)
+    ├── chunks/                                     # Lazy-loaded trajectory chunks (~180 MB)
+    └── reports/                                    # Summary CSVs (whale, chaser, operator, etc.)
 ```
 
 ---
@@ -69,7 +69,7 @@ August 2026/
 | 7 | `generate_player_behavior_data.py` | `player_behavior_data.json` |
 | 8 | `build_individual_dossiers.py` | `individual_dossiers_data.json` (42 players + 35 operators) |
 | 9 | `prepare_dashboard_data.py` | `dashboard_data.json` (master BI payload) |
-| 10 | `generate_dashboard_html.py` | `bi_dashboard.html` (Main Console) |
+| 10 | `generate_dashboard_html.py` | `bi_dashboard.html` (Main Console) — Fixed paths: REPORT_DIR→DATA_DIR for index files, new CHUNK_SRC_DIR for per-file chunks; hardened skip-guard with chunks_complete() check; removed unverified Executive Findings & Strategic Directives matrix |
 | 11 | `generate_behavior_dashboard_html.py` | `player_behavior_dashboard.html` |
 | 12 | `inject_dossier_tabs.py` | Injects dossier system into behavior console |
 | 13 | `probability_he_ingest.py` | `game_probability_he_data.json` (refresh/backfill) |
@@ -107,7 +107,7 @@ flowchart TD
 
     subgraph DASH["src/dashboard/ — dashboard prep & rendering"]
         S9["Step 9 · prepare_dashboard_data.py"]
-        S10["Step 10 · generate_dashboard_html.py"]
+        S10["Step 10 · generate_dashboard_html.py\n       Fixed paths: REPORT_DIR→DATA_DIR for index files,\n       new CHUNK_SRC_DIR for per-file chunks; hardened skip-guard\n       with chunks_complete() check; removed unverified Executive\n       Findings & Strategic Directives matrix (Whale Exposure / Tilt Intervention\n       / Regional Push Windows / B2B Skin Hegemony cards + dead execTilt JS)"]
         S11["Step 11 · generate_behavior_dashboard_html.py"]
         S12["Step 12 · inject_dossier_tabs.py"]
         S14["Step 14 · generate_probability_dashboard_html.py"]

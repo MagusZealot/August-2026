@@ -81,6 +81,12 @@ Large files (name-only, DO NOT READ):
  │   │   ├── generate_probability_dashboard_html.py     (step 14: probability & HE console)
  │   │   ├── inject_dossier_tabs.py                     (step 12: dossier tabs in behavior console)
  │   │   ├── regenerate_summary_csvs.py                 (helper: regenerates whale/chaser CSVs from unified index for consistency)
+│   │   ├── generate_dashboard_html.py         # Fixed paths: REPORT_DIR→DATA_DIR for index files,
+│   │   │                     # new CHUNK_SRC_DIR for per-file chunks; hardened skip-guard
+│   │   │                     # with chunks_complete() check; removed unverified Executive
+│   │   │                     # Findings & Strategic Directives matrix (Whale Exposure /
+│   │   │                     # Tilt Intervention / Regional Push Windows / B2B Skin Hegemony
+│   │   │                     # cards + dead execTilt JS)
  │   │   └── sections/                                  (reusable HTML/JS components)
  │   │       ├── nav_buttons.html                       (nav buttons for tabs 6 & 7)
  │   │       ├── tab_players.html                       (Tab 6: ALL-player browser UI)
