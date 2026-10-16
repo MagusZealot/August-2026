@@ -1103,18 +1103,33 @@ dashboard generator:
     - KPI strip: Global Average Pace, Selected Game Baseline, Average Std Dev,
       Active Fleet (dealer/table counts)
     - Watchlist: Slow Dealers — dealers slower than the selected game's baseline
-      by >= 1.50 s or in its slowest 10%, paginated (20/page) horizontal bar
-      chart with color-coded severity
-    - Combined Efficiency Matrix — scatter of Avg Time (speed) vs Std Dev
+      by >= 1.50 s or in its slowest 10%, horizontal bar chart with color-coded
+      severity and click-to-open dealer dossier
+    - Watchlist: High-Variance Shifts — rows where dealer's daily STD_TIMEDIFF
+      exceeds 200% of its 30-day moving average, horizontal bar chart (top 30,
+      dataZoom slider for the rest, dashed 2.0x threshold line); clicking a bar
+      opens that dealer's dossier. Also rendered per-dealer inside each dealer
+      dossier panel (top 20 of that dealer's shifts).
       (consistency) for all dealer+table profiles in the selected game
     - Dealer Speed Over Time — daily baseline line plus up to five fastest and
-      five slowest dealer trend lines, with dataZoom and markLine average
+      five slowest dealer trend lines, with dataZoom and a dashed golden markLine
+      labeled "Baseline Avg: X.XX s"
     - Top / Bottom 10 Dealer & Table Profiles — horizontal bar chart ranked by
-      average time, fastest in green, slowest in red, both in amber
+      average time, fastest in green, slowest in red
+    - Day-of-the-Week Volatility — highest/lowest bars highlighted in red/green
+      for both AVG_TIMEDIFF and STD_TIMEDIFF series, with a centered color
+      legend naming the extreme day and value for each series
     - Individualized Dealer Dossier — card grid of dealers with KPIs and a
-      per-dealer trend chart (lazy-loaded on click)
+      per-dealer trend chart (lazy-loaded on click). Filters: baseline
+      (above/below), min days (14/30/60+), week-over-week (faster/slower/no-data),
+      high-variance shifts (has / none). Clicking a card opens the dealer dossier
+      panel with context-switching penalty and per-dealer high-variance shifts
     - Forensics table — full telemetry listing with billing date, game type,
-      dealer, table no, avg time and std dev
+      dealer, table no, avg time and std dev; paginated 100/page
+    - Jump to interface — sticky header nav with links to all sections
+      (KPIs, Day-of-Week Volatility, both watchlists, Dealer Speed Over Time,
+      Efficiency Matrix, Top/Bottom 10 Profiles, Individualized Dealer Dossier,
+      Forensics Table)
 
 ==============================================================================
 EOF

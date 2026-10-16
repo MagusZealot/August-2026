@@ -172,6 +172,21 @@ KEY RECENT FIXES (2026-10-09 to 2026-10-13)
     - Zero-breach filtering on breach charts
     - 7-day trend window option added
 
+12. DEALER & TABLE PACE CONSOLE (Step 16):
+    - Game-type selector scopes all KPIs/charts/tables to one game
+    - Watchlist: Slow Dealers — horizontal bar chart, click opens dealer dossier
+    - Watchlist: High-Variance Shifts — dealer daily STD > 200% of 30-day moving avg,
+      top 30 bars + dataZoom slider, click opens dealer dossier; per-dealer panel
+      inside each dealer dossier (top 20 shifts)
+    - High Variance Shifts filter on Individualized Dealer Dossier card grid
+    - Dealer Speed Over Time — baseline line + top/bottom 5 dealer trends,
+      dashed golden "Baseline Avg" markLine
+    - Day-of-Week Volatility — highest/lowest bars red/green, centered color legend
+    - Efficiency Matrix, Pace Extremes (top/bottom 10), Individualized Dealer
+      Dossier with filters (baseline, min days, WoW, high-variance shifts)
+    - Forensics table — paginated 100/page
+    - Jump to interface — sticky header nav linking to all sections
+
 --------------------------------------------------------------------------------
 RUNTIME NOTES
 --------------------------------------------------------------------------------

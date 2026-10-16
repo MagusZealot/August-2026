@@ -308,6 +308,7 @@ def _aggregate(df):
 
         # --- Dealer cards: per-dealer stats + WoW + versatility ---------
         latest_date = max(sub["date"].unique().to_list()) if len(sub) else None
+        hv_dealer_set = set(a["dealer"] for a in micro_alerts) if micro_alerts else set()
         dealer_cards = []
         for r in dealer_agg.iter_rows(named=True):
             name = r["entity_id"]
@@ -337,6 +338,7 @@ def _aggregate(df):
                 "records": int(r["records"]),
                 "versatilityScore": versatility_map.get(name, 0),
                 "wow": wow,
+                "hasHighVariance": name in hv_dealer_set,
             })
         dealer_cards.sort(key=lambda x: -(x["avgTime"] or 0))
 
@@ -472,6 +474,13 @@ TEMPLATE_START = r"""<!DOCTYPE html>
     }
     .game-tags button.active { background: #1e3a5f; border-color: #34d399; color: #34d399; }
     .game-tags button:hover:not(.active) { border-color: #4a5a7a; background: #1a2740; }
+    .quick-nav { position: sticky; top: 72px; z-index: 10; flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 12px; padding: 10px 0; border-top: 1px solid #253247; background: #090e1a; }
+    .header-quick-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+    .header-quick-nav .quick-nav-label { color: #77869c; font-size: 10px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; margin-right: 2px; }
+    .header-quick-nav a { padding: 5px 10px; border: 1px solid #2b3b57; border-radius: 7px; background: #0f1a2e; color: #9fb2ca; text-decoration: none; font-size: 11px; font-weight: 600; white-space: nowrap; }
+    .header-quick-nav a:hover { border-color: #34d399; color: #6ee7b7; }
+    .header-quick-nav a.section-link { color: #8fa3bd; }
+    .header-quick-nav a.section-link:hover { border-color: #38bdf8; color: #7dd3fc; }
     main { max-width: 1480px; margin: auto; padding: 22px; }
     .section { margin-bottom: 16px; }
     .hero { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 18px; }
@@ -539,6 +548,7 @@ TEMPLATE_START = r"""<!DOCTYPE html>
         <a href="game_probability_dashboard.html"><i class="fa-solid fa-dice"></i> Probability & HE</a>
         <a href="player_behavior_dashboard.html"><i class="fa-solid fa-gamepad"></i> Player Behavior</a>
       </nav>
+      <nav class="header-quick-nav" id="paceQuickNav" aria-label="Jump to sections"></nav>
     </div>
   </header>
   <main>
@@ -554,9 +564,10 @@ TEMPLATE_START = r"""<!DOCTYPE html>
         <h3>Day-of-the-Week Volatility</h3>
         <div class="muted">Mean AVG_TIMEDIFF and STD_TIMEDIFF across the 7 days of the week</div>
         <div id="dowVolatilityChart" class="chart"></div>
+        <div id="dowVolatilityLegend" style="margin-top: 8px; font-size: 11px; color: #94a3b8; display: flex; justify-content: center; gap: 16px; align-items: center;"></div>
       </article>
     </section>
-    <section class="card watchlist section" aria-labelledby="watchlistTitle">
+    <section class="card watchlist section" id="slowDealersSection" aria-labelledby="watchlistTitle">
       <h3 id="watchlistTitle"><i class="fa-solid fa-triangle-exclamation"></i> Watchlist: Slow Dealers</h3>
       <p class="muted">Dealers slower than the selected game's baseline by at least 1.50 seconds or in its slowest 10%.</p>
       <div class="pagination">
@@ -570,10 +581,10 @@ TEMPLATE_START = r"""<!DOCTYPE html>
       <article class="card chart-card wide full-width">
         <h3><i class="fa-solid fa-triangle-exclamation"></i> Watchlist: High-Variance Shifts</h3>
         <p class="muted">Rows where dealer's daily STD_TIMEDIFF > 200% of 30-day moving average</p>
-        <div id="highVarianceTable" style="overflow: auto; max-height: 400px; margin-top: 12px;">Loading high-variance shifts...</div>
+        <div id="highVarianceChart" class="chart"></div>
       </article>
     </section>
-    <section class="card watchlist section" aria-labelledby="tableWatchlistTitle">
+    <section class="card watchlist section" id="slowTablesSection" aria-labelledby="tableWatchlistTitle">
       <h3 id="tableWatchlistTitle"><i class="fa-solid fa-table"></i> Watchlist: Slow Tables</h3>
       <p class="muted">Tables slower than the selected game's baseline by at least 1.50 seconds or in its slowest 10%.</p>
       <div class="pagination">
@@ -583,28 +594,28 @@ TEMPLATE_START = r"""<!DOCTYPE html>
         <div id="tableWatchlistChart" class="chart"></div>
       </div>
     </section>
-    <section class="grid section">
+    <section class="grid section" id="dealerTrendSection">
       <article class="card chart-card wide full-width">
         <h3>Dealer Speed Over Time</h3>
         <div class="muted">Selected game's daily dealer baseline and up to five fastest and five slowest dealer trends</div>
         <div id="dealerTrend" class="chart"></div>
       </article>
     </section>
-    <section class="grid section">
+    <section class="grid section" id="efficiencyMatrixSection">
       <article class="card chart-card wide full-width">
         <h3>Combined Efficiency Matrix</h3>
         <div class="muted">Average time (speed) vs standard deviation (consistency), selected game only</div>
         <div id="efficiencyMatrix" class="chart"></div>
       </article>
     </section>
-    <section class="grid section">
+    <section class="grid section" id="paceExtremesSection">
       <article class="card chart-card wide">
         <h3>Top / Bottom 10 Dealer & Table Profiles</h3>
         <div class="muted">Fastest and slowest entity profiles by average time, ranked within the selected game only</div>
         <div id="paceExtremes" class="chart"></div>
       </article>
     </section>
-    <section class="section">
+    <section class="section" id="dealerDossierCardsSection">
       <article class="card chart-card wide full-width">
         <h3>Individualized Dealer Dossier</h3>
         <div class="muted">Select a dealer to view their KPIs and performance trend</div>
@@ -635,6 +646,14 @@ TEMPLATE_START = r"""<!DOCTYPE html>
               <option value="no-data">No Week-over-Week Data</option>
             </select>
           </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label style="font-size: 11px; color: #94a3b8;">High Variance Shifts:</label>
+            <select id="filterHighVariance" style="padding: 6px 10px; border: 1px solid #344258; border-radius: 6px; background: #111b2d; color: #e2e8f0; font-size: 11px;">
+              <option value="">All</option>
+              <option value="yes">Has High-Variance Shifts</option>
+              <option value="no">No High-Variance Shifts</option>
+            </select>
+          </div>
           <button id="clearFilters" type="button" style="padding: 6px 12px; border: 1px solid #344258; border-radius: 6px; background: #111b2d; color: #94a3b8; font-size: 11px; cursor: pointer;">Clear Filters</button>
         </div>
         <div id="dealerCardGrid" class="dealer-grid" style="padding: 16px; max-width: 100%; box-sizing: border-box;"></div>
@@ -658,10 +677,15 @@ TEMPLATE_START = r"""<!DOCTYPE html>
               <strong>Context-Switching Penalty:</strong> Average time on single-game vs multi-game days
             </div>
             <div id="dealerContextSwitchChart" class="chart" style="height: 200px; margin-top: 12px;"></div>
+            <div style="margin-top: 24px;">
+              <strong>High-Variance Shifts:</strong> Days where this dealer's STD_TIMEDIFF exceeded 200% of their 30-day moving average
+            </div>
+            <div id="dealerHighVarianceChart" class="chart" style="height: 200px; margin-top: 12px;"></div>
+            <div id="dealerHighVarianceNote" style="margin-top: 6px; color: #94a3b8; font-size: 11px;"></div>
           </div>
         </div>
       </section>
-    <section class="card chart-card wide section" aria-labelledby="forensicsTitle">
+    <section class="card chart-card wide section" id="forensicsSection" aria-labelledby="forensicsTitle">
       <h3 id="forensicsTitle">Forensics Table</h3>
       <div class="muted">Full telemetry for the selected game, with search and pagination</div>
       <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 12px 0;">
@@ -715,7 +739,7 @@ TEMPLATE_START = r"""<!DOCTYPE html>
     };
     const chartIds = ['dowVolatilityChart', 'watchlistChart', 'tableWatchlistChart',
       'efficiencyMatrix', 'dealerTrend', 'paceExtremes', 'dealerDossierTrend',
-      'dealerContextSwitchChart'];
+      'dealerContextSwitchChart', 'highVarianceChart', 'dealerHighVarianceChart'];
     const charts = {};
     if (typeof window.echarts !== 'undefined') {
       chartIds.forEach(id => {
@@ -766,6 +790,22 @@ TEMPLATE_START = r"""<!DOCTYPE html>
     function renderDowVolatility(game) {
       const rows = Array.isArray(game.dowVolatility) ? game.dowVolatility : [];
       if (!rows.length) return showEmpty('dowVolatilityChart', 'No day-of-week data');
+      const avgs = rows.map(row => row.avgAVG ?? 0);
+      const stds = rows.map(row => row.avgSTD ?? 0);
+      const maxAvg = Math.max(...avgs), minAvg = Math.min(...avgs);
+      const maxStd = Math.max(...stds), minStd = Math.min(...stds);
+      const hiColor = '#fb7185';
+      const loColor = '#34d399';
+      const avgItemStyle = avgs.map(v => {
+        if (v === maxAvg) return { color: hiColor };
+        if (v === minAvg) return { color: loColor };
+        return { color: palette[0] };
+      });
+      const stdItemStyle = stds.map(v => {
+        if (v === maxStd) return { color: hiColor };
+        if (v === minStd) return { color: loColor };
+        return { color: palette[2] };
+      });
       setChart('dowVolatilityChart', {
         color: [palette[0], palette[2]], tooltip: Object.assign({}, tooltipStyle, { trigger: 'axis' }),
         legend: { top: 0, textStyle: { color: theme.text } },
@@ -773,10 +813,22 @@ TEMPLATE_START = r"""<!DOCTYPE html>
         xAxis: { type: 'category', data: rows.map(row => row.dayName), ...axisStyle },
         yAxis: { type: 'value', name: 'Seconds', ...axisStyle },
         series: [
-          { name: 'Mean AVG_TIMEDIFF', type: 'bar', data: rows.map(row => row.avgAVG), barMaxWidth: 28 },
-          { name: 'Mean STD_TIMEDIFF', type: 'bar', data: rows.map(row => row.avgSTD), barMaxWidth: 28 }
+          { name: 'Mean AVG_TIMEDIFF', type: 'bar', data: avgs.map((v, i) => ({ value: v, itemStyle: avgItemStyle[i] })), barMaxWidth: 28 },
+          { name: 'Mean STD_TIMEDIFF', type: 'bar', data: stds.map((v, i) => ({ value: v, itemStyle: stdItemStyle[i] })), barMaxWidth: 28 }
         ]
       });
+      const legend = document.getElementById('dowVolatilityLegend');
+      if (legend) {
+        const hiAvg = rows[avgs.indexOf(maxAvg)].dayName;
+        const loAvg = rows[avgs.indexOf(minAvg)].dayName;
+        const hiStd = rows[stds.indexOf(maxStd)].dayName;
+        const loStd = rows[stds.indexOf(minStd)].dayName;
+        legend.innerHTML =
+          '<span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:' + hiColor + ';border-radius:2px;display:inline-block"></span>Highest: ' + escapeHtml(hiAvg) + ' (' + fmt2(maxAvg) + 's)</span>' +
+          '<span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:' + loColor + ';border-radius:2px;display:inline-block"></span>Lowest: ' + escapeHtml(loAvg) + ' (' + fmt2(minAvg) + 's)</span>' +
+          '<span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:' + hiColor + ';border-radius:2px;display:inline-block"></span>Highest STD: ' + escapeHtml(hiStd) + ' (' + fmt2(maxStd) + 's)</span>' +
+          '<span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:' + loColor + ';border-radius:2px;display:inline-block"></span>Lowest STD: ' + escapeHtml(loStd) + ' (' + fmt2(minStd) + 's)</span>';
+      }
     }
 function renderWatchlist(game) {
       const rows = Array.isArray(game.watchlistDealers) ? game.watchlistDealers : [];
@@ -894,8 +946,12 @@ function renderWatchlist(game) {
       const trend = game.dealerTrend || {};
       const dates = Array.isArray(trend.dates) ? trend.dates : [];
       if (!dates.length) return showEmpty('dealerTrend', 'No dealer trend data');
+      const baseline = Array.isArray(trend.baseline) ? trend.baseline : [];
+      const baselineAvg = baseline.length
+        ? baseline.reduce((s, v) => s + (numeric(v) || 0), 0) / baseline.length
+        : null;
       const series = [{ name: selectedGame + ' baseline', type: 'line',
-        data: Array.isArray(trend.baseline) ? trend.baseline : [], showSymbol: false,
+        data: baseline, showSymbol: false,
         lineStyle: { color: '#f8fafc', width: 3 } }];
       (Array.isArray(trend.dealers) ? trend.dealers : []).forEach((dealer, i) => series.push({
         name: dealer.name, type: 'line', data: dealer.data, showSymbol: false, connectNulls: false,
@@ -909,7 +965,17 @@ function renderWatchlist(game) {
         xAxis: { type: 'category', boundaryGap: false, data: dates, ...axisStyle,
           axisLabel: { color: theme.text, rotate: dates.length > 20 ? 35 : 0 } },
         yAxis: { type: 'value', name: 'AVG_TIMEDIFF (s)', nameTextStyle: { color: theme.text }, ...axisStyle },
-        dataZoom: [{ type: 'inside' }, { type: 'slider', height: 16, bottom: 10 }], series: series
+        dataZoom: [{ type: 'inside' }, { type: 'slider', height: 16, bottom: 10 }], series: series,
+        markLine: baselineAvg != null ? {
+          symbol: ['none', 'none'],
+          lineStyle: { color: '#fbbf24', type: 'dashed', width: 2 },
+          label: {
+            formatter: 'Baseline Avg: ' + fmt2(baselineAvg) + ' s',
+            color: '#fbbf24', backgroundColor: '#1e293b', padding: [5, 10], borderRadius: 4,
+            fontWeight: 600, fontSize: 11
+          },
+          data: [{ yAxis: baselineAvg }]
+        } : null
       });
       if (charts.dealerTrend) {
         charts.dealerTrend.off('click');
@@ -956,16 +1022,61 @@ function renderWatchlist(game) {
 
     function renderHighVariance(game) {
       const rows = Array.isArray(game.microAlerts) ? game.microAlerts : [];
-      const host = document.getElementById('highVarianceTable');
-      if (!rows.length) {
-        host.innerHTML = '<div class="table-empty">No high-variance shifts in this game.</div>';
-        return;
+      const host = document.getElementById('highVarianceChart');
+      // Remove any stale note from a previous game
+      const oldNote = host.nextElementSibling;
+      if (oldNote && oldNote.classList.contains('muted') && oldNote.textContent && oldNote.textContent.includes('high-variance shifts')) {
+        oldNote.remove();
       }
-      host.innerHTML = '<table><thead><tr><th>Dealer</th><th>Date</th><th>Current std dev</th>' +
-        '<th>30-day average</th><th>Ratio</th></tr></thead><tbody>' + rows.map(row =>
-          '<tr><td>' + escapeHtml(row.dealer) + '</td><td>' + escapeHtml(row.date) + '</td><td>' +
-          fmt2(row.currentStd) + '</td><td>' + fmt2(row.movingAvg) + '</td><td>' + fmt2(row.ratio) + '?</td></tr>'
-        ).join('') + '</tbody></table>';
+      if (!rows.length) return showEmpty('highVarianceChart', 'No high-variance shifts in this game.');
+      const sorted = rows.slice().sort((a, b) => (b.ratio || 0) - (a.ratio || 0));
+      const MAX_SHOW = 30;
+      const shown = sorted.slice(0, MAX_SHOW);
+      const hidden = sorted.length - MAX_SHOW;
+      setChart('highVarianceChart', {
+        color: ['#fb7185'],
+        tooltip: Object.assign({}, tooltipStyle, { trigger: 'axis', axisPointer: { type: 'shadow' },
+          formatter: params => {
+            const row = shown[params[0].dataIndex];
+            return '<strong>' + escapeHtml(row.dealer) + '</strong><br>' +
+              escapeHtml(row.date) + '<br>Current std dev: ' + fmt2(row.currentStd) +
+              ' s<br>30-day average: ' + fmt2(row.movingAvg) + ' s<br>Ratio: ' + fmt2(row.ratio) + 'x';
+          }
+        }),
+        grid: { left: 200, right: 40, top: 42, bottom: 38, containLabel: true },
+        xAxis: { type: 'value', name: 'Ratio (current / 30-day avg)', ...axisStyle },
+        yAxis: { type: 'category', inverse: true, data: shown.map(row => escapeHtml(row.dealer) + ' · ' + escapeHtml(row.date)), ...axisStyle,
+          axisLabel: { color: theme.text, width: 220, overflow: 'truncate' } },
+        series: [{
+          type: 'bar', data: shown.map(row => row.ratio), barMaxWidth: 18,
+          itemStyle: { color: '#fb7185', borderRadius: [0, 4, 4, 0] },
+          label: { show: true, position: 'right', color: theme.text, formatter: p => fmt2(p.value) + 'x' }
+        }],
+        markLine: {
+          symbol: ['none', 'none'],
+          lineStyle: { color: '#38bdf8', type: 'dashed', width: 2 },
+          label: { formatter: '2.0x threshold', color: '#f8fafc', backgroundColor: '#38bdf8', padding: [4, 8], borderRadius: 4, position: 'insideEndTop', fontWeight: 600, fontSize: 11 },
+          data: [{ xAxis: 2 }]
+        },
+        dataZoom: [{ type: 'inside' }, { type: 'slider', height: 14, bottom: 8 }]
+      });
+      if (charts.highVarianceChart) {
+        charts.highVarianceChart.off('click');
+        charts.highVarianceChart.on('click', params => {
+          if (params.dataIndex != null && shown[params.dataIndex]) {
+            renderDealerDossier(game, shown[params.dataIndex].dealer);
+          }
+        });
+      }
+      if (hidden > 0) {
+        const note = document.createElement('div');
+        note.className = 'muted';
+        note.style.textAlign = 'right';
+        note.style.marginTop = '6px';
+        note.style.fontSize = '11px';
+        note.textContent = 'Showing top ' + MAX_SHOW.toLocaleString() + ' of ' + sorted.length.toLocaleString() + ' high-variance shifts (' + hidden.toLocaleString() + ' more)';
+        host.parentNode.insertBefore(note, host.nextSibling);
+      }
     }
 
     function filteredDealerCards(game) {
@@ -973,6 +1084,7 @@ function renderWatchlist(game) {
       const baselineFilter = document.getElementById('filterBaseline').value;
       const minDays = Number(document.getElementById('filterMinDays').value || 0);
       const wowFilter = document.getElementById('filterWow').value;
+      const hvFilter = document.getElementById('filterHighVariance').value;
       const baseline = numeric((game.kpis || {}).gameBaseline);
       return cards.filter(card => {
         if (Number(card.days || 0) < minDays) return false;
@@ -981,6 +1093,8 @@ function renderWatchlist(game) {
         if (wowFilter === 'no-data' && card.wow) return false;
         if (wowFilter === 'faster' && (!card.wow || card.wow.isWorse !== false)) return false;
         if (wowFilter === 'slower' && (!card.wow || card.wow.isWorse !== true)) return false;
+        if (hvFilter === 'yes' && !card.hasHighVariance) return false;
+        if (hvFilter === 'no' && card.hasHighVariance) return false;
         return true;
       });
     }
@@ -1058,9 +1172,51 @@ function renderWatchlist(game) {
         series: [{ type: 'bar', data: contextRows.map(row => row.value), barMaxWidth: 24,
           label: { show: true, position: 'right', color: theme.text, formatter: p => fmt2(p.value) } }]
       });
+
+      // Dealer-specific high-variance shifts
+      const dealerAlerts = Array.isArray(game.microAlerts) ? game.microAlerts.filter(r => r.dealer === dealer) : [];
+      const hvHost = document.getElementById('dealerHighVarianceChart');
+      const hvNote = document.getElementById('dealerHighVarianceNote');
+      if (!dealerAlerts.length) {
+        showEmpty('dealerHighVarianceChart', 'No high-variance shifts for this dealer.');
+        hvNote.textContent = '';
+      } else {
+        const sorted = dealerAlerts.slice().sort((a, b) => (b.ratio || 0) - (a.ratio || 0));
+        const MAX_SHOW = 20;
+        const shown = sorted.slice(0, MAX_SHOW);
+        const hidden = sorted.length - MAX_SHOW;
+        setChart('dealerHighVarianceChart', {
+          color: ['#fb7185'],
+          tooltip: Object.assign({}, tooltipStyle, { trigger: 'axis', axisPointer: { type: 'shadow' },
+            formatter: params => {
+              const row = shown[params[0].dataIndex];
+              return '<strong>' + escapeHtml(row.dealer) + '</strong><br>' +
+                escapeHtml(row.date) + '<br>Current std dev: ' + fmt2(row.currentStd) +
+                ' s<br>30-day average: ' + fmt2(row.movingAvg) + ' s<br>Ratio: ' + fmt2(row.ratio) + 'x';
+            }
+          }),
+          grid: { left: 120, right: 30, top: 32, bottom: 30, containLabel: true },
+          xAxis: { type: 'value', name: 'Ratio (current / 30-day avg)', ...axisStyle },
+          yAxis: { type: 'category', inverse: true, data: shown.map(row => escapeHtml(row.date)), ...axisStyle },
+          series: [{
+            type: 'bar', data: shown.map(row => row.ratio), barMaxWidth: 16,
+            itemStyle: { color: '#fb7185', borderRadius: [0, 4, 4, 0] },
+            label: { show: true, position: 'right', color: theme.text, formatter: p => fmt2(p.value) + 'x' }
+          }],
+          markLine: {
+            symbol: ['none', 'none'],
+            lineStyle: { color: '#38bdf8', type: 'dashed', width: 2 },
+            label: { formatter: '2.0x threshold', color: '#f8fafc', backgroundColor: '#38bdf8', padding: [4, 8], borderRadius: 4, position: 'insideEndTop', fontWeight: 600, fontSize: 10 },
+            data: [{ xAxis: 2 }]
+          },
+          dataZoom: [{ type: 'inside' }, { type: 'slider', height: 10, bottom: 6 }]
+        });
+        hvNote.textContent = shown.length + ' shift(s)' + (hidden > 0 ? ' (top ' + MAX_SHOW + ' of ' + sorted.length + ')' : '');
+      }
       requestAnimationFrame(() => {
         if (charts.dealerDossierTrend) charts.dealerDossierTrend.resize();
         if (charts.dealerContextSwitchChart) charts.dealerContextSwitchChart.resize();
+        if (charts.dealerHighVarianceChart) charts.dealerHighVarianceChart.resize();
       });
     }
 
@@ -1102,6 +1258,26 @@ function renderWatchlist(game) {
       });
     }
 
+    function buildPaceQuickNav() {
+      const nav = document.getElementById('paceQuickNav');
+      if (!nav) return;
+      const links = [
+        { href: '#kpis', label: 'KPIs' },
+        { href: '#dowVolatilitySection', label: 'Day-of-Week Volatility' },
+        { href: '#slowDealersSection', label: 'Watchlist: Slow Dealers' },
+        { href: '#highVarianceWatchlistSection', label: 'Watchlist: High-Variance Shifts' },
+        { href: '#slowTablesSection', label: 'Watchlist: Slow Tables' },
+        { href: '#dealerTrendSection', label: 'Dealer Speed Over Time' },
+        { href: '#efficiencyMatrixSection', label: 'Efficiency Matrix' },
+        { href: '#paceExtremesSection', label: 'Top / Bottom 10 Profiles' },
+        { href: '#dealerDossierCardsSection', label: 'Individualized Dealer Dossier' },
+        { href: '#forensicsSection', label: 'Forensics Table' }
+      ];
+      nav.innerHTML = '<span class="quick-nav-label">Jump to</span>' + links.map(link =>
+        `<a class="section-link" href="${link.href}">${escapeHtml(link.label)}</a>`
+      ).join('');
+    }
+
     function renderGame() {
       const game = currentData();
       if (!game) return;
@@ -1138,7 +1314,7 @@ function renderWatchlist(game) {
     document.getElementById('forensicsNextPage').addEventListener('click', () => {
       currentPage += 1; renderForensics();
     });
-    ['filterBaseline', 'filterMinDays', 'filterWow'].forEach(id =>
+    ['filterBaseline', 'filterMinDays', 'filterWow', 'filterHighVariance'].forEach(id =>
       document.getElementById(id).addEventListener('change', () => {
         dealerCardLimit = CARD_PAGE_SIZE; renderDealerCards(currentData());
       })
@@ -1147,6 +1323,7 @@ function renderWatchlist(game) {
       document.getElementById('filterBaseline').value = '';
       document.getElementById('filterMinDays').value = '';
       document.getElementById('filterWow').value = '';
+      document.getElementById('filterHighVariance').value = '';
       dealerCardLimit = CARD_PAGE_SIZE; renderDealerCards(currentData());
     });
     document.getElementById('loadMoreBtn').addEventListener('click', () => {
@@ -1165,6 +1342,7 @@ function renderWatchlist(game) {
     });
 
     renderGame();
+    buildPaceQuickNav();
     let resizePending = false;
     function resizeCharts() {
       if (resizePending) return;

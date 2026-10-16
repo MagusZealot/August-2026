@@ -201,9 +201,14 @@ are data sources.
   and Dealer & Table Pace consoles. All four share `dashboard-common.css` for
   consistent styling and include cross-dashboard navigation buttons.
 - **Dealer & Table Pace Intelligence:** Analyze the combined dealer/table
-  feed with a game-type selector that isolates all KPIs, charts, the slow-dealer
-  watchlist, and performance forensics. Dealer and table observations remain
-  distinct because the source does not provide dealer/table pairings.
+  feed with a game-type selector that isolates all KPIs, charts, watchlists
+  and performance forensics. Includes slow-dealer and high-variance-shift
+  watchlists (click to open dealer dossiers), efficiency matrix, day-of-week
+  volatility, dealer speed over time with baseline average, individualized
+  dealer dossiers with context-switching penalty and high-variance shifts,
+  paginated forensics table, and a sticky header "Jump to" interface. Dealer
+  and table observations remain distinct because the source does not provide
+  dealer/table pairings.
 - **Probability and HE trends:** Switch between the HE and probability trend
   views and filter them with the date-range selector. The range also updates
   the cross-game comparison charts; without a range, their precomputed values
