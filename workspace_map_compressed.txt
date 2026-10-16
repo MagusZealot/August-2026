@@ -53,6 +53,7 @@ August 2026/
 │   └── verify/               # Inspection/verification utilities
 ├── output/
 │   ├── dashboards/           # Generated HTML dashboards
+│   │   ├── dashboard-common.css   # Shared stylesheet (consistent look across all dashboards)
 │   │   ├── bi_dashboard.html                     # ~11 MB (Oriental Gaming Title BI & Risk Intelligence Console)
 │   │   ├── game_probability_dashboard.html       # Probability & HE Console
 │   │   ├── player_behavior_dashboard.html        # Player Behavioral Intelligence Console
@@ -177,4 +178,6 @@ RUNTIME NOTES
 - Use `py` not `python` (Microsoft Store alias blocked)
 - All scripts use HARDCODED paths — edit constants at top of file to change targets
 - Dashboard HTML files link to each other (cross-dashboard nav)
+- Shared stylesheet: output/dashboards/dashboard-common.css (consistent look across all 4 dashboards)
+- All 4 generator scripts updated with CSS link + cross-links to other dashboards
 - Viewer.html polls output/progress.json for live pipeline progress

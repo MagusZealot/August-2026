@@ -14,7 +14,7 @@ from pathlib import Path
 REPORT_DIR = Path(WORKSPACE / "output" / "dashboards")
 DATA_DIR = Path(WORKSPACE / "output")
 FOLDER = REPORT_DIR.parent
-DATA_FILE = DATA_DIR / "player_behavior_data.json"
+DATA_FILE = DATA_DIR / "data" / "player_behavior_data.json"
 
 def build_dashboard():
     if not DATA_FILE.exists():
@@ -38,6 +38,7 @@ def build_dashboard():
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="dashboard-common.css">
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -180,6 +181,10 @@ def build_dashboard():
           <a href="game_probability_dashboard.html" class="px-3.5 py-2 rounded-lg bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 text-xs font-semibold flex items-center gap-2 border border-emerald-700/50 transition" title="Open Game Probability & House-Edge Dashboard">
             <i class="fa-solid fa-dice text-emerald-400"></i>
             <span>Probability &amp; HE</span>
+          </a>
+          <a href="round_dealer_table_time_dashboard.html" class="px-3.5 py-2 rounded-lg bg-cyan-950/60 hover:bg-cyan-900 text-cyan-300 text-xs font-semibold flex items-center gap-2 border border-cyan-700/50 transition" title="Open Dealer & Table Pace Dashboard">
+            <i class="fa-solid fa-gauge-high text-cyan-400"></i>
+            <span>Dealer &amp; Table Pace</span>
           </a>
           <button id="viewToggleBtn" onclick="togglePresentationMode()" class="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-2 border border-slate-700 transition">
             <i class="fa-solid fa-person-chalkboard text-cyan-400"></i>

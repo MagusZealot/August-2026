@@ -44,6 +44,11 @@ August 2026/
 │   └── dashboard/                    # Dashboard preparation (steps 9-12, 14, 16)
 └── output/                           # Generated artifacts (gitignored)
     ├── dashboards/                   # Interactive HTML dashboards
+    │   ├── dashboard-common.css   # Shared stylesheet (consistent look across all dashboards)
+    │   ├── bi_dashboard.html                # Main BI & Risk Intelligence Console
+    │   ├── player_behavior_dashboard.html   # Player Behavioral Intelligence Console
+    │   ├── game_probability_dashboard.html  # Probability & HE Console
+    │   └── round_dealer_table_time_dashboard.html  # Dealer & Table Pace Intelligence
     ├── data/                         # JSON payloads (indexes, behavior, dossiers)
     ├── chunks/                       # Lazy-loaded trajectory chunks (~180 MB)
     └── reports/                      # Summary CSVs (whale, chaser, operator, etc.)
@@ -193,7 +198,8 @@ are data sources.
 - **Currency standardization:** Amounts are converted to PHP using
   date-relative historical rates from frankfurter.app.
 - **Four linked dashboards:** Navigate between the BI, Behavior, Probability,
-  and Dealer & Table Pace consoles.
+  and Dealer & Table Pace consoles. All four share `dashboard-common.css` for
+  consistent styling and include cross-dashboard navigation buttons.
 - **Dealer & Table Pace Intelligence:** Analyze the combined dealer/table
   feed with a game-type selector that isolates all KPIs, charts, the slow-dealer
   watchlist, and performance forensics. Dealer and table observations remain

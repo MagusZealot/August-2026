@@ -99,6 +99,7 @@ Large files (name-only, DO NOT READ):
  │
 |-- output/ (generated artifacts)
   |   |-- dashboards/
+  |   |   |-- dashboard-common.css   # Shared stylesheet (consistent look across all dashboards)
   |   |   |-- bi_dashboard.html
   |   |   |-- game_probability_dashboard.html
   |   |   |-- player_behavior_dashboard.html
@@ -509,7 +510,7 @@ data\probability\mnt_game_probability_he_YYYYMMDD.csv
 
 RUNTIME (browser): bi_dashboard.html embeds the index + operator dossiers;
 each player card click lazy-loads its chunk_NNNN.js from dossier_chunks\.
-The three dashboard HTML files link to one another.
+The four dashboard HTML files link to one another via shared dashboard-common.css stylesheet.
 
 
 --------------------------------------------------------------------------------

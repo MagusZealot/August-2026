@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 from collections import defaultdict
 
-DATA_FILE = Path(WORKSPACE / "output" / "dashboard_data.json")
+DATA_FILE = Path(WORKSPACE / "output" / "data" / "dashboard_data.json")
 with open(DATA_FILE, "r", encoding="utf-8") as f:
     master_data = json.load(f)
 
@@ -240,7 +240,7 @@ else:
 index_meta = unified_index.get("meta", {})
 index_players = unified_index.get("players", [])
 
-DOSSIER_DATA_FILE = Path(WORKSPACE / "output" / "individual_dossiers_data.json")
+DOSSIER_DATA_FILE = Path(WORKSPACE / "output" / "data" / "individual_dossiers_data.json")
 with open(DOSSIER_DATA_FILE, "r", encoding="utf-8") as df:
     detailed_operators = json.load(df).get("operators", [])
 
@@ -278,6 +278,7 @@ html_template = f'''<!DOCTYPE html>
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="dashboard-common.css">
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -428,6 +429,10 @@ html_template = f'''<!DOCTYPE html>
           <a href="game_probability_dashboard.html" class="px-3.5 py-2 rounded-lg bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 text-xs font-semibold flex items-center gap-2 border border-emerald-700/50 transition" title="Open Game Probability & House-Edge Dashboard">
             <i class="fa-solid fa-dice text-emerald-400"></i>
             <span>Probability &amp; HE</span>
+          </a>
+          <a href="round_dealer_table_time_dashboard.html" class="px-3.5 py-2 rounded-lg bg-cyan-950/60 hover:bg-cyan-900 text-cyan-300 text-xs font-semibold flex items-center gap-2 border border-cyan-700/50 transition" title="Open Dealer & Table Pace Dashboard">
+            <i class="fa-solid fa-gauge-high text-cyan-400"></i>
+            <span>Dealer &amp; Table Pace</span>
           </a>
           <button id="viewToggleBtn" onclick="togglePresentationMode()" class="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-2 border border-slate-700 transition">
             <i class="fa-solid fa-person-chalkboard text-indigo-400"></i>
@@ -1924,7 +1929,7 @@ html_template = f'''<!DOCTYPE html>
       geoContainer.innerHTML = '';
       countryDist.forEach(c => {{
         const pct = (c.debit / DATA.whales.total_debit * 100).toFixed(1);
-        const FLAG_MAP = {'Indonesia':'🇮🇩','Vietnam':'🇻🇳','China':'🇨🇳','Bangladesh':'🇧🇩','Thailand':'🇹🇭','Malaysia':'🇲🇾','India':'🇮🇳','Myanmar':'🇲🇲','Philippines':'🇵🇭','Cambodia':'🇰🇭','Laos':'🇱🇦','Singapore':'🇸🇬','South Korea':'🇰🇷','Japan':'🇯🇵','USA':'🇺🇸','Hong Kong':'🇭🇰','Taiwan':'🇹🇼','Nepal':'🇳🇵','Turkey':'🇹🇷','Crypto':'₿','Unknown':'🌐'};
+        const FLAG_MAP = {{'Indonesia':'🇮🇩','Vietnam':'🇻🇳','China':'🇨🇳','Bangladesh':'🇧🇩','Thailand':'🇹🇭','Malaysia':'🇲🇾','India':'🇮🇳','Myanmar':'🇲🇲','Philippines':'🇵🇭','Cambodia':'🇰🇭','Laos':'🇱🇦','Singapore':'🇸🇬','South Korea':'🇰🇷','Japan':'🇯🇵','USA':'🇺🇸','Hong Kong':'🇭🇰','Taiwan':'🇹🇼','Nepal':'🇳🇵','Turkey':'🇹🇷','Crypto':'₿','Unknown':'🌐'}};
         const flag = FLAG_MAP[c.country] || '🌐';
         const div = document.createElement('div');
         div.className = 'p-2 rounded-lg bg-slate-800/50 border border-slate-700/50 flex items-center justify-between';

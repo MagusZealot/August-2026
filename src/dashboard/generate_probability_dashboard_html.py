@@ -35,6 +35,7 @@ def build_dashboard():
   <title>Game Probability &amp; House Edge Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="dashboard-common.css">
   <style>
     :root { color-scheme: dark; font-family: Inter, "Segoe UI", sans-serif; background: #090e1a; color: #e2e8f0; scroll-behavior: smooth; }
     * { box-sizing: border-box; }
@@ -97,6 +98,7 @@ def build_dashboard():
     <nav aria-label="Dashboards">
       <a href="bi_dashboard.html"><i class="fa-solid fa-chart-line"></i> BI Console</a>
       <a href="player_behavior_dashboard.html"><i class="fa-solid fa-gamepad"></i> Player Behavior</a>
+      <a href="round_dealer_table_time_dashboard.html"><i class="fa-solid fa-gauge-high"></i> Dealer & Table Pace</a>
     </nav>
     <div class="filters">
       <label class="muted" for="periodFilter">Trend window<br><select id="periodFilter"><option value="7">Latest 7 days</option><option value="90">Latest 90 days</option><option value="365">Latest 365 days</option><option value="all">All available dates</option></select></label>

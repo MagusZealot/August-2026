@@ -67,7 +67,7 @@ flowchart TD
     PIPE --> REPORTS[/"output/reports/<br/>Analysis CSV files"/]
     PIPE --> DATA[/"output/data/<br/>JSON payloads and player indexes"/]
     PIPE --> CHUNKS[/"output/chunks/<br/>Lazy-loaded player trajectories"/]
-    PIPE --> DASH[/"output/dashboards/<br/>BI, Behavior, Probability, and Dealer &amp; Table Pace consoles"/]
+    PIPE --> DASH[/"output/dashboards/<br/>BI, Behavior, Probability, Dealer &amp; Table Pace consoles<br/>+ dashboard-common.css (shared stylesheet)"/]
     PIPE --> PACE_OUT[/"output/round_dealer_table_time_data.json"/]
     PIPE --> PROGRESS[/"output/progress.json<br/>Pipeline status"/]
 ```
